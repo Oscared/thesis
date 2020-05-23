@@ -2,9 +2,7 @@ import visdom
 from datasets import get_dataset, HyperX
 import utils
 import numpy as np
-import sklearn.svm
 import seaborn as sns
-import importlib
 
 import torch
 import torch.nn as nn
@@ -14,155 +12,200 @@ import torch.optim as optim
 from torch.nn import init
 import torch.utils.data as data
 from torchsummary import summary
+from torch.utils.tensorboard  import SummaryWriter
 
 import math
 import os
 import datetime
 from sklearn.externals import joblib
 from tqdm import tqdm
+import argparse
 
-vis = visdom.Visdom()
+def main():
+    parser = argparse.ArgumentParser(description="Hyperspectral image classification with FixMatch")
+    parser.add_argument('--patch_size', type=int, default=5,
+                        help='Size of patch around each pixel taken for classification')
+    parser.add_argument('--center_pixel', action='store_true', default=False,
+                        help='use if you only want to consider the label of the center pixel of a patch')
+    parser.add_argument('--batch_size', type=int, default=64,
+                        help='Size of each batch for training')
+    parser.add_argument('--epochs', type=int, default=20,
+                        help='number of total epochs of training to run')
+    parser.add_argument('--dataset', type=str, default='Salinas',
+                        help='Name of dataset to run, Salinas or PaviaU')
+    parser.add_argument('--device', type=str, default='cpu',
+                        help='what device to run on, cpu or gpu')
+    parser.add_argument('--warmup', type=float, default=0,
+                        help='warmup epochs')
+    parser.add_argument('--threshold', type=float, default=0.95,
+                        help='confidence threshold for pseudo labels')
+    parser.add_argument('--save', action='store_true', default=False,
+                        help='use to save model weights when running')
+    parser.add_argument('--test_stride', type=int, default=3,
+                        help='length of stride when sliding patch window over image for testing')
+    parser.add_argument('--sampling_percentage', type=float, default=0.3,
+                        help='percentage of dataset to sample for training (labeled and unlabeled included)')
+    parser.add_argument('-sampling_mode', type=str, default='disjoint',
+                        help='how to sample data, disjoint, random, or fixed')
+    parser.add_argument('--lr', type=float, default=0.03,
+                        help='initial learning rate')
+    parser.add_argument('unlabeled_ratio', type=int, default=7,
+                        help='ratio of unlabeled data to labeled (spliting the training data into these ratios)')
+    parser.add_argument('--class_balancing', action='store_true', default=True,
+                        help='use to balance weights according to ratio in dataset')
+    parser.add_argument('--checkpoint', type=str, default=None,
+                        help='use to load model weights from a certain directory')
+    parser.add_argument('--flip_augmentation', action='store_true', default=True,
+                        help='use to flip augmentation data for use')
+    parser.add_argument('--radiation_noise', action='store_true', default=True,
+                        help='use to radiation noise data for use')
+    parser.add_argument('--mixture_noise', action='store_true', default=True,
+                        help='use to mixture noise data for use')
+    parser.add_argument('--results', type=str, default='results',
+                        help='where to save results to')
 
+    parser.add_argument('--supervision', type=str, default='full',
+                        help='check this more, use to make us of all labeled or not, full or semi')
 
-salinas_img, salinas_gt, salinas_label_values, salinas_ignored_labels, salinas_rgb_bands, salinas_palette = get_dataset("Salinas")
+    args = parser.parse_arg()
 
-N_CLASSES = len(salinas_label_values)
-N_BANDS = salinas_img.shape[-1]
+    vis = visdom.Visdom()
 
-if salinas_palette is None:
-    # Generate color palette
-    salinas_palette = {0: (0, 0, 0)}
-    for k, color in enumerate(sns.color_palette("hls", len(salinas_label_values) - 1)):
-        salinas_palette[k + 1] = tuple(np.asarray(255 * np.array(color), dtype='uint8'))
-invert_palette = {v: k for k, v in salinas_palette.items()}
+    os.makedirs(args.out, exist_ok=True)
+    writer = SummaryWriter(args.out)
 
-def convert_to_color(x):
-    return utils.convert_to_color_(x, palette=salinas_palette)
-def convert_from_color(x):
-    return utils.convert_from_color_(x, palette=invert_palette)
+    img, gt, label_values, ignored_labels, rgb_bands, palette = get_dataset(args.dataset)
 
-SAMPLE_PERCENTAGE = 0.3
-SAMPLING_MODE = 'disjoint' #random, fixed, disjoint
+    args.n_classes = len(label_values)
+    args.n_bands = img.shape[-1]
+    args.ignored_labels = ignored_labels
 
-train_gt, test_gt = utils.sample_gt(salinas_gt, SAMPLE_PERCENTAGE, mode=SAMPLING_MODE)
-print("{} samples selected (over {})".format(np.count_nonzero(train_gt), np.count_nonzero(salinas_gt)))
+    if palette is None:
+        # Generate color palette
+        palette = {0: (0, 0, 0)}
+        for k, color in enumerate(sns.color_palette("hls", len(label_values) - 1)):
+            palette[k + 1] = tuple(np.asarray(255 * np.array(color), dtype='uint8'))
+    invert_palette = {v: k for k, v in palette.items()}
 
-utils.display_predictions(convert_to_color(train_gt), vis, caption="Train ground truth")
-utils.display_predictions(convert_to_color(test_gt), vis, caption="Test ground truth")
+    def convert_to_color(x):
+        return utils.convert_to_color_(x, palette=palette)
+    def convert_from_color(x):
+        return utils.convert_from_color_(x, palette=invert_palette)
 
-device = torch.device('cpu')
+    train_gt, test_gt = utils.sample_gt(gt, args.sampling_percentage,
+                                        mode=args.sampling_mode)
+    print("{} samples selected (over {})".format(np.count_nonzero(train_gt), np.count_nonzero(gt)))
 
-hyperparams = {'patch_size' : 1, 'ignored_labels' : salinas_ignored_labels, 'flip_augmentation' : False,
-              'radiation_augmentation' : False, 'mixture_augmentation' : False, 'center_pixel' : True,
-              'supervision' : 'full', 'batch_size' : 100, 'epochs' : 100, 'dataset' : 'Salinas',
-              'n_classes' : N_CLASSES, 'test_stride' : 1, 'scheduler' : None, 'weights' : None,
-              'device' : device, 'n_bands' : N_BANDS, 'warmup' : 0, 'threshold' : 0.95, 'labeled' : True}
+    utils.display_predictions(convert_to_color(train_gt), vis,
+                              caption="Train ground truth")
+    utils.display_predictions(convert_to_color(test_gt), vis,
+                              caption="Test ground truth")
 
-weights = torch.ones(N_CLASSES)
-weights[torch.LongTensor(salinas_ignored_labels)] = 0
-weights = weights.to(device)
+    device = torch.device(args.device)
 
-hyperparams['patch_size'] = 5
-hyperparams['center_pixel'] = True
-hyperparams['epochs'] = 10
-hyperparams['warmup'] = 1
-hyperparams['batch_size'] = 64
+    weights = torch.ones(args.n_classes)
+    weights[torch.LongTensor(args.ignored_labels)] = 0
+    weights = weights.to(device)
 
-hyperparams['flip_augmentation'] = True
+    model = HamidaEtAl(args.n_bands, args.n_classes,
+                       patch_size=args.patch_size)
 
-model = HamidaEtAl(hyperparams['n_bands'], hyperparams['n_classes'],
-                   patch_size=hyperparams['patch_size'])
-lr =  0.03
-optimizer = optim.SGD(model.parameters(), lr=lr, momentum=0.9, nesterov=True)
-loss = nn.CrossEntropyLoss(weight=weights)
+    optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=0.9,
+                          nesterov=True)
+    loss = nn.CrossEntropyLoss(weight=weights)
 
-train_gt, val_gt = utils.sample_gt(train_gt, 0.95, mode='disjoint')
+    train_gt, val_gt = utils.sample_gt(train_gt, 0.95, mode=args.sampling_mode)
 
-val_dataset = HyperX(salinas_img, val_gt, **hyperparams)
-val_loader = data.DataLoader(val_dataset,
-                             batch_size=hyperparams['batch_size'])
+    val_dataset = HyperX(img, val_gt, labeled=True, **args)
+    val_loader = data.DataLoader(val_dataset,
+                                 batch_size=args.batch_size)
 
-samples = np.count_nonzero(train_gt)
-unlabeled_portion = 7
+    samples = np.count_nonzero(train_gt)
 
-train_labeled_gt, train_unlabeled_gt = utils.sample_gt(train_gt, 1/(unlabeled_portion + 1), mode='disjoint')
+    train_labeled_gt, train_unlabeled_gt = utils.sample_gt(train_gt, 1/(args.unlabeled_ratio + 1),
+                                                           mode=args.sampling_mode)
 
-train_labeled_dataset = HyperX(salinas_img, train_labeled_gt, **hyperparams)
-train_labeled_loader = data.DataLoader(train_labeled_dataset, batch_size=hyperparams['batch_size'],
-                               shuffle=True, drop_last=True)
+    train_labeled_dataset = HyperX(img, train_labeled_gt, labeled=True, **args)
+    train_labeled_loader = data.DataLoader(train_labeled_dataset, batch_size=args.batch_size,
+                                   shuffle=True, drop_last=True)
 
-hyperparams['labeled'] = False
-train_unlabeled_dataset = HyperX(salinas_img, train_unlabeled_gt, **hyperparams)
-train_unlabeled_loader = data.DataLoader(train_unlabeled_dataset,
-                                         batch_size=hyperparams['batch_size']*unlabeled_portion,
-                                         shuffle=True, drop_last=True)
-
-
-amount_labeled = samples//(unlabeled_portion + 1)
-
-iterations = amount_labeled // hyperparams['batch_size']
-total_steps = iterations * hyperparams['epochs']
-hyperparams['scheduler'] = get_cosine_schedule_with_warmup(optimizer,
-                                                           hyperparams['warmup']*iterations, total_steps)
-
-utils.display_predictions(convert_to_color(train_labeled_gt), vis, caption="Labeled train ground truth")
-utils.display_predictions(convert_to_color(train_unlabeled_gt), vis, caption="Unlabeled train ground truth")
-utils.display_predictions(convert_to_color(val_gt), vis, caption="Validation ground truth")
-
-CLASS_BALANCING = True
-
-if CLASS_BALANCING:
-    weights_balance = utils.compute_imf_weights(train_gt, hyperparams['n_classes'], salinas_ignored_labels)
-    hyperparams['weights'] = torch.from_numpy(weights_balance)
-
-CHECKPOINT = None #checkpoint to load weights from, string from where to load model
-
-print(hyperparams)
-print("Network :")
-with torch.no_grad():
-    for input, _ in train_labeled_loader:
-        break
-    summary(model.to(hyperparams['device']), input.size()[1:])
-    # We would like to use device=hyperparams['device'] altough we have
-    # to wait for torchsummary to be fixed first.
-
-if CHECKPOINT is not None:
-    model.load_state_dict(torch.load(CHECKPOINT))
-
-try:
-    train(model, optimizer, loss, train_labeled_loader, train_unlabeled_loader, hyperparams['epochs'],
-          scheduler=hyperparams['scheduler'], device=hyperparams['device'], threshold=hyperparams['threshold'],
-          val_loader=val_loader, display=vis)
-except KeyboardInterrupt:
-    # Allow the user to stop the training
-    pass
-
-probabilities = test(model, salinas_img, hyperparams)
-prediction = np.argmax(probabilities, axis=-1)
-
-run_results = utils.metrics(prediction, test_gt, ignored_labels=hyperparams['ignored_labels'], n_classes=hyperparams['n_classes'])
-
-mask = np.zeros(salinas_gt.shape, dtype='bool')
-for l in hyperparams['ignored_labels']:
-    mask[salinas_gt == l] = True
-prediction[mask] = 0
-
-color_prediction = convert_to_color(prediction)
-utils.display_predictions(color_prediction, vis, gt=convert_to_color(test_gt), caption="Prediction vs. test ground truth")
-
-utils.show_results(run_results, vis, label_values=salinas_label_values)
+    train_unlabeled_dataset = HyperX(img, train_unlabeled_gt, labeled=False, **args)
+    train_unlabeled_loader = data.DataLoader(train_unlabeled_dataset,
+                                             batch_size=args.batch_size*unlabeled_portion,
+                                             shuffle=True, drop_last=True)
 
 
-def train(net, optimizer, criterion, labeled_data_loader, unlabeled_data_loader, epoch, threshold, scheduler=None,
-          display_iter=100, device=torch.device('cpu'), display=None,
-          val_loader=None):
+    amount_labeled = samples // (args.unlabeled_ratio + 1)
+
+    iterations = amount_labeled // args.batch_size
+    total_steps = iterations * args.epochs
+    args.scheduler = get_cosine_schedule_with_warmup(optimizer,
+                                                     args.warmup*iterations,
+                                                     total_steps)
+
+    utils.display_predictions(convert_to_color(train_labeled_gt), vis,
+                              caption="Labeled train ground truth")
+    utils.display_predictions(convert_to_color(train_unlabeled_gt), vis,
+                              caption="Unlabeled train ground truth")
+    utils.display_predictions(convert_to_color(val_gt), vis,
+                              caption="Validation ground truth")
+
+    if args.class_balancing:
+        weights_balance = utils.compute_imf_weights(train_gt, args.n_classes,
+                                                    args.ignored_labels)
+        hyperparams['weights'] = torch.from_numpy(weights_balance)
+
+    print(args)
+    print("Network :")
+    with torch.no_grad():
+        for input, _ in train_labeled_loader:
+            break
+        summary(model.to(device), input.size()[1:])
+        # We would like to use device=hyperparams['device'] altough we have
+        # to wait for torchsummary to be fixed first.
+
+    if args.checkpoint is not None:
+        model.load_state_dict(torch.load(args.checkpoint))
+
+    try:
+        train(model, optimizer, loss, train_labeled_loader,
+              train_unlabeled_loader, args.epochs, writer=writer,
+              scheduler=args.scheduler, device=args.device,
+              threshold=args.threshold, val_loader=val_loader, display=vis,
+              save=args.save)
+    except KeyboardInterrupt:
+        # Allow the user to stop the training
+        pass
+
+    probabilities = test(model, img, args)
+    prediction = np.argmax(probabilities, axis=-1)
+
+    run_results = utils.metrics(prediction, test_gt,
+                                ignored_labels=args.ignored_labels,
+                                n_classes=args.n_classes)
+
+    mask = np.zeros(gt.shape, dtype='bool')
+    for l in args.ignored_labels:
+        mask[gt == l] = True
+    prediction[mask] = 0
+
+    color_prediction = convert_to_color(prediction)
+    utils.display_predictions(color_prediction, vis, gt=convert_to_color(test_gt),
+                              caption="Prediction vs. test ground truth")
+
+    utils.show_results(run_results, vis, label_values=label_values)
+
+def train(net, optimizer, criterion, labeled_data_loader, unlabeled_data_loader,
+          epoch, threshold, writer, scheduler=None, display_iter=100, device='cpu',
+          display=None, val_loader=None, save=False):
     """
     Training loop to optimize a network for several epochs and a specified loss
     Args:
         net: a PyTorch model
         optimizer: a PyTorch optimizer
         labeled_data_loader: a PyTorch dataset loader for the labeled dataset
-        unlabeled_data_loader: a PyTorch dataset loader for the weakly and strongly augmented, unlabeled dataset
+        unlabeled_data_loader: a PyTorch dataset loader for the weakly and
+                               strongly augmented, unlabeled dataset
         epoch: int specifying the number of training epochs
         threshold: probability thresold for pseudo labels acceptance
         criterion: a PyTorch-compatible loss function, e.g. nn.CrossEntropyLoss
@@ -176,6 +219,8 @@ def train(net, optimizer, criterion, labeled_data_loader, unlabeled_data_loader,
 
     if criterion is None:
         raise Exception("Missing criterion. You must specify a loss function.")
+
+    device = torch.device(device)
 
     net.to(device)
 
@@ -193,16 +238,19 @@ def train(net, optimizer, criterion, labeled_data_loader, unlabeled_data_loader,
         net.train()
         avg_loss = 0.
 
+        losses = AverageMeter()
+        losses_x = AverageMeter()
+        losses_u = AverageMeter()
+
         train_loader = zip(labeled_data_loader, unlabeled_data_loader)
 
         # Run the training loop for one epoch
         for batch_idx, (data_x, data_u) in tqdm(enumerate(train_loader), total=len(labeled_data_loader)):
-            # Load the data into the GPU if required
             inputs_x, targets_x = data_x
             inputs_u_w, inputs_u_s = data_u
 
             batch_size = inputs_x.shape[0]
-
+            # Load the data into the GPU if required
             inputs = torch.cat((inputs_x, inputs_u_w, inputs_u_s)).to(device)
             targets_x = targets_x.to(device)
             logits = net(inputs)
@@ -226,6 +274,11 @@ def train(net, optimizer, criterion, labeled_data_loader, unlabeled_data_loader,
 
             loss.backward()
             optimizer.step()
+
+            losses.update(loss.item())
+            losses_x.update(Lx.item())
+            losses_u.update(Lu.item())
+            mask_prob = mask.mean().item()
 
             avg_loss += loss.item()
             losses[iter_] = loss.item()
@@ -262,7 +315,7 @@ def train(net, optimizer, criterion, labeled_data_loader, unlabeled_data_loader,
         # Update the scheduler
         avg_loss /= len(labeled_data_loader)
         if val_loader is not None:
-            val_acc = val(net, val_loader, device=device, supervision='full')
+            val_acc, val_loss = val(net, val_loader, device=device, supervision='full')
             val_accuracies.append(val_acc)
             metric = -val_acc
         else:
@@ -273,10 +326,47 @@ def train(net, optimizer, criterion, labeled_data_loader, unlabeled_data_loader,
         elif scheduler is not None:
             scheduler.step()
 
+        writer.add_scalar('train/1.train_loss', losses, e)
+        writer.add_scalar('train/2.train_loss_x', losses_x, e)
+        writer.add_scalar('train/3.train_loss_u', losses_u, e)
+        writer.add_scalar('train/4.mask', mask_prob, e)
+        writer.add_scalar('test/1.test_acc', val_acc, e)
+        writer.add_scalar('test/2.test_loss', val_loss, e)
+
         # Save the weights
-        if e % save_epoch == 0:
+        if e % save_epoch == 0 && save == True:
             save_model(net, utils.camel_to_snake(str(net.__class__.__name__)),
                        labeled_data_loader.dataset.name, epoch=e, metric=abs(metric))
+
+
+def val(net, data_loader, device='cpu', supervision='full'):
+    """
+    Validate the model on the validation dataset
+    """
+    # TODO : fix me using metrics()
+    accuracy, total = 0., 0.
+    ignored_labels = data_loader.dataset.ignored_labels
+    for batch_idx, (data, target) in enumerate(data_loader):
+        with torch.no_grad():
+            # Load the data into the GPU if required
+            data, target = data.to(device), target.to(device)
+            if supervision == 'full':
+                output = net(data)
+            elif supervision == 'semi':
+                outs = net(data)
+                output, rec = outs
+            _, output = torch.max(output, dim=1)
+            loss = F.cross_entropy(output, target)
+            for out, pred in zip(output.view(-1), target.view(-1)):
+                if out.item() in ignored_labels:
+                    continue
+                else:
+                    accuracy += out.item() == pred.item()
+                    total += 1
+                    """
+                    Check this more to see if the loss is correct! 
+                    """
+    return accuracy / total, loss / total
 
 
 def save_model(model, model_name, dataset_name, **kwargs):
@@ -296,17 +386,17 @@ def save_model(model, model_name, dataset_name, **kwargs):
          joblib.dump(model, model_dir + filename + '.pkl')
 
 
-def test(net, img, hyperparams):
+def test(net, img, args):
     """
     Test a model on a specific image
     """
     net.eval()
-    patch_size = hyperparams['patch_size']
-    center_pixel = hyperparams['center_pixel']
-    batch_size, device = hyperparams['batch_size'], hyperparams['device']
-    n_classes = hyperparams['n_classes']
+    patch_size = args.patch_size
+    center_pixel = args.center_pixel
+    batch_size, device = args.batch_size, torch.device(args.device)
+    n_classes = args.n_classes
 
-    kwargs = {'step': hyperparams['test_stride'], 'window_size': (patch_size, patch_size)}
+    kwargs = {'step': args.test_stride, 'window_size': (patch_size, patch_size)}
     probs = np.zeros(img.shape[:2] + (n_classes,))
 
     iterations = utils.count_sliding_window(img, **kwargs) // batch_size
@@ -329,7 +419,7 @@ def test(net, img, hyperparams):
             output = net(data)
             if isinstance(output, tuple):
                 output = output[0]
-            output = output.to('cpu')
+            output = output.to(args.device)
 
             if patch_size == 1 or center_pixel:
                 output = output.numpy()
@@ -341,31 +431,6 @@ def test(net, img, hyperparams):
                 else:
                     probs[x:x + w, y:y + h] += out
     return probs
-
-def val(net, data_loader, device='cpu', supervision='full'):
-    """
-    Validate the model on the validation dataset
-    """
-    # TODO : fix me using metrics()
-    accuracy, total = 0., 0.
-    ignored_labels = data_loader.dataset.ignored_labels
-    for batch_idx, (data, target) in enumerate(data_loader):
-        with torch.no_grad():
-            # Load the data into the GPU if required
-            data, target = data.to(device), target.to(device)
-            if supervision == 'full':
-                output = net(data)
-            elif supervision == 'semi':
-                outs = net(data)
-                output, rec = outs
-            _, output = torch.max(output, dim=1)
-            for out, pred in zip(output.view(-1), target.view(-1)):
-                if out.item() in ignored_labels:
-                    continue
-                else:
-                    accuracy += out.item() == pred.item()
-                    total += 1
-    return accuracy / total
 
 
 class HamidaEtAl(nn.Module):
@@ -447,11 +512,8 @@ class HamidaEtAl(nn.Module):
         x = self.fc(x)
         return x
 
-def get_cosine_schedule_with_warmup(optimizer,
-                                    num_warmup_steps,
-                                    num_training_steps,
-                                    num_cycles=7./16.,
-                                    last_epoch=-1):
+def get_cosine_schedule_with_warmup(optimizer, num_warmup_steps, num_training_steps,
+                                    num_cycles=7./16., last_epoch=-1):
     """
     Training scheme for the learning rate with a cosine schedule with warmup
     """
@@ -463,3 +525,25 @@ def get_cosine_schedule_with_warmup(optimizer,
         return max(0., math.cos(math.pi * num_cycles * no_progress))
 
     return LambdaLR(optimizer, _lr_lambda, last_epoch)
+
+
+class AverageMeter(object):
+    """
+    Computes and stores the average and current value
+    Imported from https://github.com/pytorch/examples/blob/master/imagenet/main.py#L247-L262
+    """
+
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.val = 0
+        self.avg = 0
+        self.sum = 0
+        self.count = 0
+
+    def update(self, val, n=1):
+        self.val = val
+        self.sum += val * n
+        self.count += n
+        self.avg = self.sum / self.count

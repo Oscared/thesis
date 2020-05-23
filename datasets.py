@@ -111,7 +111,7 @@ def get_dataset(dataset_name, target_folder="/home/oscar/Desktop/Exjobb/Data/"):
 class HyperX(torch.utils.data.Dataset):
     """ Generic class for a hyperspectral scene """
 
-    def __init__(self, data, gt, **hyperparams):
+    def __init__(self, data, gt, labeled=True, **args):
         """
         Args:
             data: 3D hyperspectral image
@@ -125,15 +125,15 @@ class HyperX(torch.utils.data.Dataset):
         super(HyperX, self).__init__()
         self.data = data
         self.label = gt
-        self.patch_size = hyperparams['patch_size']
-        self.name = hyperparams['dataset']
-        self.ignored_labels = set(hyperparams['ignored_labels'])
-        self.flip_augmentation = hyperparams['flip_augmentation']
-        self.radiation_augmentation = hyperparams['radiation_augmentation']
-        self.mixture_augmentation = hyperparams['mixture_augmentation']
-        self.center_pixel = hyperparams['center_pixel']
-        self.labeled = hyperparams['labeled']
-        supervision = hyperparams['supervision']
+        self.patch_size = args.patch_size
+        self.name = args.dataset
+        self.ignored_labels = set(args.ignored_labels)
+        self.flip_augmentation = args.flip_augmentation
+        self.radiation_augmentation = args.radiation_augmentation
+        self.mixture_augmentation = args.mixture_augmentation
+        self.center_pixel = args.center_pixel
+        self.labeled = labeled
+        supervision = args.supervision
         # Fully supervised : use all pixels with label not ignored
         if supervision == 'full':
             mask = np.ones_like(gt)
@@ -197,9 +197,9 @@ class HyperX(torch.utils.data.Dataset):
                 # Perform data augmentation (only on 2D patches)
                 data, label = self.flip(data, label)
             if self.radiation_augmentation and np.random.random() < 0.1:
-                    data = self.radiation_noise(data)
+                data = self.radiation_noise(data)
             if self.mixture_augmentation and np.random.random() < 0.2:
-                    data = self.mixture_noise(data, label)
+                data = self.mixture_noise(data, label)
 
             # Copy the data into numpy arrays (PyTorch doesn't like numpy views)
             data = np.asarray(np.copy(data).transpose((2, 0, 1)), dtype='float32')
