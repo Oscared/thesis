@@ -195,6 +195,8 @@ def main():
 
     utils.show_results(run_results, vis, label_values=label_values)
 
+    writer.close()
+
 def train(net, optimizer, criterion, labeled_data_loader, unlabeled_data_loader,
           epoch, threshold, writer, scheduler=None, display_iter=100, device='cpu',
           display=None, val_loader=None, save=False):
@@ -238,7 +240,7 @@ def train(net, optimizer, criterion, labeled_data_loader, unlabeled_data_loader,
         net.train()
         avg_loss = 0.
 
-        losses = AverageMeter()
+        losses_meter = AverageMeter()
         losses_x = AverageMeter()
         losses_u = AverageMeter()
 
@@ -275,7 +277,7 @@ def train(net, optimizer, criterion, labeled_data_loader, unlabeled_data_loader,
             loss.backward()
             optimizer.step()
 
-            losses.update(loss.item())
+            losses_meter.update(loss.item())
             losses_x.update(Lx.item())
             losses_u.update(Lu.item())
             mask_prob = mask.mean().item()
@@ -286,8 +288,10 @@ def train(net, optimizer, criterion, labeled_data_loader, unlabeled_data_loader,
 
             if display_iter and iter_ % display_iter == 0:
                 string = 'Train (epoch {}/{}) [{}/{} ({:.0f}%)]\tLoss: {:.6f}'
-                string = string.format(e, epoch, batch_idx * len(data_x), len(data_x) * len(labeled_data_loader),
-                                       100. * batch_idx / len(labeled_data_loader), mean_losses[iter_])
+                string = string.format(e, epoch, batch_idx * len(data_x),
+                                       len(data_x) * len(labeled_data_loader),
+                                       100. * batch_idx / len(labeled_data_loader),
+                                       mean_losses[iter_])
                 update = None if loss_win is None else 'append'
                 loss_win = display.line(
                     X=np.arange(iter_ - display_iter, iter_),
@@ -326,12 +330,12 @@ def train(net, optimizer, criterion, labeled_data_loader, unlabeled_data_loader,
         elif scheduler is not None:
             scheduler.step()
 
-        writer.add_scalar('train/1.train_loss', losses, e)
-        writer.add_scalar('train/2.train_loss_x', losses_x, e)
-        writer.add_scalar('train/3.train_loss_u', losses_u, e)
+        writer.add_scalar('train/1.train_loss', losses_meter.avg, e)
+        writer.add_scalar('train/2.train_loss_x', losses_x.avg, e)
+        writer.add_scalar('train/3.train_loss_u', losses_u.avg, e)
         writer.add_scalar('train/4.mask', mask_prob, e)
         writer.add_scalar('test/1.test_acc', val_acc, e)
-        writer.add_scalar('test/2.test_loss', val_loss, e)
+        writer.add_scalar('test/2.test_loss', val_loss.avg, e)
 
         # Save the weights
         if e % save_epoch == 0 && save == True:
@@ -346,6 +350,10 @@ def val(net, data_loader, device='cpu', supervision='full'):
     # TODO : fix me using metrics()
     accuracy, total = 0., 0.
     ignored_labels = data_loader.dataset.ignored_labels
+
+    val_loss = AverageMeter()
+    val_acc = AverageMeter()
+
     for batch_idx, (data, target) in enumerate(data_loader):
         with torch.no_grad():
             # Load the data into the GPU if required
@@ -357,16 +365,18 @@ def val(net, data_loader, device='cpu', supervision='full'):
                 output, rec = outs
             _, output = torch.max(output, dim=1)
             loss = F.cross_entropy(output, target)
+            val_loss.update(loss.item())
             for out, pred in zip(output.view(-1), target.view(-1)):
                 if out.item() in ignored_labels:
                     continue
                 else:
                     accuracy += out.item() == pred.item()
+                    val_acc.update(accuracy)
                     total += 1
                     """
-                    Check this more to see if the loss is correct! 
+                    Check this more to see if the loss is correct!
                     """
-    return accuracy / total, loss / total
+    return accuracy / total, val_loss
 
 
 def save_model(model, model_name, dataset_name, **kwargs):
