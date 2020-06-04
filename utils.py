@@ -82,17 +82,22 @@ def convert_from_color_(arr_3d, palette=None):
     return arr_2d
 
 
-def display_predictions(pred, vis, gt=None, caption=""):
+def display_predictions(pred, vis, gt=None, writer=None, caption=""):
     if gt is None:
         vis.images([np.transpose(pred, (2, 0, 1))],
                     opts={'caption': caption})
+        if writer is not None:
+            writer.add_image(caption, np.transpose(pred, (2, 0, 1)))
     else:
         vis.images([np.transpose(pred, (2, 0, 1)),
                     np.transpose(gt, (2, 0, 1))],
                     nrow=2,
                     opts={'caption': caption})
+        if writer is not None:
+            writer.add_images(caption, np.array([np.transpose(pred, (2, 0, 1)),
+                        np.transpose(gt, (2, 0, 1))]))
 
-def display_dataset(img, gt, bands, labels, palette, vis):
+def display_dataset(img, gt, bands, labels, palette, vis, writer=None):
     """Display the specified dataset.
     Args:
         img: 3D hyperspectral image
@@ -112,6 +117,8 @@ def display_dataset(img, gt, bands, labels, palette, vis):
     # send to visdom server
     vis.images([np.transpose(rgb, (2, 0, 1))],
                 opts={'caption': caption})
+    if writer is not None:
+        writer.add_image(caption, np.transpose(rgb, (2, 0, 1)))
 
 def explore_spectrums(img, complete_gt, class_names, vis,
                       ignored_labels=None):
@@ -322,7 +329,7 @@ def metrics(prediction, target, ignored_labels=[], n_classes=None):
     return results
 
 
-def show_results(results, vis, label_values=None, agregated=False):
+def show_results(results, vis, writer=None, label_values=None, agregated=False):
     text = ""
 
     if agregated:
@@ -376,6 +383,8 @@ def show_results(results, vis, label_values=None, agregated=False):
 
     vis.text(text.replace('\n', '<br/>'))
     print(text)
+    if writer is not None:
+        writer.add_text('Results', text)
 
 
 def sample_gt(gt, train_size, mode='random'):
@@ -426,7 +435,7 @@ def sample_gt(gt, train_size, mode='random'):
                 first_half_count = np.count_nonzero(mask[:x, :])
                 second_half_count = np.count_nonzero(mask[x:, :])
                 try:
-                    ratio = first_half_count / second_half_count
+                    ratio = first_half_count / ( first_half_count + second_half_count )
                     if ratio > 0.9 * train_size and ratio < 1.1 * train_size:
                         break
                 except ZeroDivisionError:

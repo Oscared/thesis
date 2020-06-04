@@ -1,0 +1,9 @@
+channels:
+  - conda-forge
+dependencies:
+  - matplotlib 
+  - seaborn
+  - spectral
+  - scipy
+  - imageio
+  - 

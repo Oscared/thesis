@@ -6,6 +6,8 @@ import torch.utils.data
 import os
 from tqdm import tqdm
 from sklearn import preprocessing
+from sklearn.decomposition import PCA
+
 try:
     # Python 3
     from urllib.request import urlretrieve
@@ -33,7 +35,7 @@ class TqdmUpTo(tqdm):
         self.update(b * bsize - self.n)  # will also set self.n = b * bsize
 
 
-def get_dataset(dataset_name, target_folder="/home/oscar/Desktop/Exjobb/Data/"):
+def get_dataset(dataset_name, target_folder=dataset_path):
     """ Gets the dataset specified by name and return the related components.
     Args:
         dataset_name: string with the name of the dataset
@@ -111,7 +113,7 @@ def get_dataset(dataset_name, target_folder="/home/oscar/Desktop/Exjobb/Data/"):
 class HyperX(torch.utils.data.Dataset):
     """ Generic class for a hyperspectral scene """
 
-    def __init__(self, data, gt, labeled=True, **args):
+    def __init__(self, data, gt, labeled=True, pca_aug=False, **args):
         """
         Args:
             data: 3D hyperspectral image
@@ -125,15 +127,16 @@ class HyperX(torch.utils.data.Dataset):
         super(HyperX, self).__init__()
         self.data = data
         self.label = gt
-        self.patch_size = args.patch_size
-        self.name = args.dataset
-        self.ignored_labels = set(args.ignored_labels)
-        self.flip_augmentation = args.flip_augmentation
-        self.radiation_augmentation = args.radiation_augmentation
-        self.mixture_augmentation = args.mixture_augmentation
-        self.center_pixel = args.center_pixel
+        self.patch_size = args['patch_size']
+        self.name = args['dataset']
+        self.ignored_labels = set(args['ignored_labels'])
+        self.flip_augmentation = args['flip_augmentation']
+        self.radiation_augmentation = args['radiation_augmentation']
+        self.mixture_augmentation = args['mixture_augmentation']
+        self.center_pixel = args['center_pixel']
         self.labeled = labeled
-        supervision = args.supervision
+        self.pca_aug = pca_aug
+        supervision = args['supervision']
         # Fully supervised : use all pixels with label not ignored
         if supervision == 'full':
             mask = np.ones_like(gt)
@@ -146,7 +149,22 @@ class HyperX(torch.utils.data.Dataset):
         p = self.patch_size // 2
         self.indices = np.array([(x,y) for x,y in zip(x_pos, y_pos) if x > p and x < data.shape[0] - p and y > p and y < data.shape[1] - p])
         self.labels = [self.label[x,y] for x,y in self.indices]
-        np.random.shuffle(self.indices)
+        #np.random.shuffle(self.indices)
+
+        self.class_var = {}
+        for class in np.unique(self.gt):
+            if c not in self.ignored_labels:
+                l_indices = np.nonzero(self.labels==class)
+                pos = self.indices[l_indices]
+                var = np.var(self.data[pos[:,0], pos[:,1]], axis=0)
+                self.class_var[c] = np.diag(var)
+
+        if self.pca_aug:
+            centered_data = self.data - np.mean(self.data)
+            data_train, _ = utils.build_dataset(centered_data, self.label, ignored_labels = self.ignored_labels)
+            pca = PCA(n_components=11)
+            pca.fit(data_train)
+
 
     @staticmethod
     def flip(*arrays):
@@ -168,7 +186,7 @@ class HyperX(torch.utils.data.Dataset):
         alpha1, alpha2 = np.random.uniform(0.01, 1., size=2)
         noise = np.random.normal(loc=0., scale=1.0, size=data.shape)
         data2 = np.zeros_like(data)
-        for  idx, value in np.ndenumerate(label):
+        for idx, value in np.ndenumerate(label):
             if value not in self.ignored_labels:
                 l_indices = np.nonzero(self.labels == value)[0]
                 l_indice = np.random.choice(l_indices)
@@ -176,6 +194,14 @@ class HyperX(torch.utils.data.Dataset):
                 x, y = self.indices[l_indice]
                 data2[idx] = self.data[x,y]
         return (alpha1 * data + alpha2 * data2) / (alpha1 + alpha2) + beta * noise
+
+    def pca_augmentation(data, strength=1):
+        data_train = data - np.mean(data)
+        alpha = strength*np.random.uniform(0.9,1.1, np.shape(data)[0])
+        data_pca = pca.transform(data_train)
+        data_pca[:,0] = data_pca[:,0]*alpha
+        data_aug = pca.inverse_transform(data_pca)
+        return data_aug
 
     def __len__(self):
         return len(self.indices)
@@ -200,6 +226,8 @@ class HyperX(torch.utils.data.Dataset):
                 data = self.radiation_noise(data)
             if self.mixture_augmentation and np.random.random() < 0.2:
                 data = self.mixture_noise(data, label)
+            if self.pca_aug and np.random.random() < 0.2:
+                data = self.pca_augmentation(data)
 
             # Copy the data into numpy arrays (PyTorch doesn't like numpy views)
             data = np.asarray(np.copy(data).transpose((2, 0, 1)), dtype='float32')
@@ -229,17 +257,20 @@ class HyperX(torch.utils.data.Dataset):
         """
         if self.labeled == False:
             data_weak = self.data[x1:x2, y1:y2]
-            data_strong = data_weak
+            data_strong = np.copy(data_weak)
             label_weak = self.label[x1:x2, y1:y2]
-            label_strong = label_weak
+            label_strong = np.copy(label_weak)
 
             if self.flip_augmentation and self.patch_size > 1:
                 # Perform data augmentation (only on 2D patches)
                 data_weak, label_weak = self.flip(data_weak, label_weak)
                 data_strong, label_strong = self.flip(data_strong, label_strong)
-
-            data_strong = self.radiation_noise(data_strong)
-            data_strong = self.mixture_noise(data_strong, label_strong)
+            if np.random.rand() < 0.7:
+                data_strong = self.radiation_noise(data_strong)
+            if np.random.rand() < 0.7:
+                data_strong = self.mixture_noise(data_strong, label_strong)
+            if np.random.rand() < 0.7:
+                data_strong = self.pca_augmentation(data_strong, strength=1.1)
 
             # Copy the data into numpy arrays (PyTorch doesn't like numpy views)
             data_weak = np.asarray(np.copy(data_weak).transpose((2, 0, 1)), dtype='float32')

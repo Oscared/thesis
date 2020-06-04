@@ -7,6 +7,7 @@ import seaborn as sns
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torch.backends.cudnn as cudnn
 from torch.optim.lr_scheduler import LambdaLR
 import torch.optim as optim
 from torch.nn import init
@@ -17,7 +18,7 @@ from torch.utils.tensorboard  import SummaryWriter
 import math
 import os
 import datetime
-from sklearn.externals import joblib
+import joblib
 from tqdm import tqdm
 import argparse
 
@@ -25,7 +26,7 @@ def main():
     parser = argparse.ArgumentParser(description="Hyperspectral image classification with FixMatch")
     parser.add_argument('--patch_size', type=int, default=5,
                         help='Size of patch around each pixel taken for classification')
-    parser.add_argument('--center_pixel', action='store_true', default=False,
+    parser.add_argument('--center_pixel', action='store_true', default=True,
                         help='use if you only want to consider the label of the center pixel of a patch')
     parser.add_argument('--batch_size', type=int, default=64,
                         help='Size of each batch for training')
@@ -33,23 +34,23 @@ def main():
                         help='number of total epochs of training to run')
     parser.add_argument('--dataset', type=str, default='Salinas',
                         help='Name of dataset to run, Salinas or PaviaU')
-    parser.add_argument('--device', type=str, default='cpu',
-                        help='what device to run on, cpu or gpu')
+    parser.add_argument('--cuda', type=int, default=-1,
+                        help='what CUDA device to run on, -1 defaults to cpu')
     parser.add_argument('--warmup', type=float, default=0,
                         help='warmup epochs')
     parser.add_argument('--threshold', type=float, default=0.95,
                         help='confidence threshold for pseudo labels')
     parser.add_argument('--save', action='store_true', default=False,
                         help='use to save model weights when running')
-    parser.add_argument('--test_stride', type=int, default=3,
+    parser.add_argument('--test_stride', type=int, default=1,
                         help='length of stride when sliding patch window over image for testing')
     parser.add_argument('--sampling_percentage', type=float, default=0.3,
                         help='percentage of dataset to sample for training (labeled and unlabeled included)')
-    parser.add_argument('-sampling_mode', type=str, default='disjoint',
+    parser.add_argument('--sampling_mode', type=str, default='disjoint',
                         help='how to sample data, disjoint, random, or fixed')
     parser.add_argument('--lr', type=float, default=0.03,
                         help='initial learning rate')
-    parser.add_argument('unlabeled_ratio', type=int, default=7,
+    parser.add_argument('--unlabeled_ratio', type=int, default=7,
                         help='ratio of unlabeled data to labeled (spliting the training data into these ratios)')
     parser.add_argument('--class_balancing', action='store_true', default=True,
                         help='use to balance weights according to ratio in dataset')
@@ -57,9 +58,9 @@ def main():
                         help='use to load model weights from a certain directory')
     parser.add_argument('--flip_augmentation', action='store_true', default=True,
                         help='use to flip augmentation data for use')
-    parser.add_argument('--radiation_noise', action='store_true', default=True,
+    parser.add_argument('--radiation_augmentation', action='store_true', default=True,
                         help='use to radiation noise data for use')
-    parser.add_argument('--mixture_noise', action='store_true', default=True,
+    parser.add_argument('--mixture_augmentation', action='store_true', default=True,
                         help='use to mixture noise data for use')
     parser.add_argument('--results', type=str, default='results',
                         help='where to save results to')
@@ -67,12 +68,17 @@ def main():
     parser.add_argument('--supervision', type=str, default='full',
                         help='check this more, use to make us of all labeled or not, full or semi')
 
-    args = parser.parse_arg()
+    args = parser.parse_args()
+
+    device = utils.get_device(args.cuda)
+    args.device = device
 
     vis = visdom.Visdom()
 
-    os.makedirs(args.out, exist_ok=True)
-    writer = SummaryWriter(args.out)
+    tensorboard_dir = str(args.results + '/' + str(datetime.datetime.now()))
+
+    os.makedirs(tensorboard_dir, exist_ok=True)
+    writer = SummaryWriter(tensorboard_dir)
 
     img, gt, label_values, ignored_labels, rgb_bands, palette = get_dataset(args.dataset)
 
@@ -95,13 +101,12 @@ def main():
     train_gt, test_gt = utils.sample_gt(gt, args.sampling_percentage,
                                         mode=args.sampling_mode)
     print("{} samples selected (over {})".format(np.count_nonzero(train_gt), np.count_nonzero(gt)))
+    writer.add_text('Amount of training samples', "{} samples selected (over {})".format(np.count_nonzero(train_gt), np.count_nonzero(gt)))
 
     utils.display_predictions(convert_to_color(train_gt), vis,
                               caption="Train ground truth")
     utils.display_predictions(convert_to_color(test_gt), vis,
                               caption="Test ground truth")
-
-    device = torch.device(args.device)
 
     weights = torch.ones(args.n_classes)
     weights[torch.LongTensor(args.ignored_labels)] = 0
@@ -116,7 +121,7 @@ def main():
 
     train_gt, val_gt = utils.sample_gt(train_gt, 0.95, mode=args.sampling_mode)
 
-    val_dataset = HyperX(img, val_gt, labeled=True, **args)
+    val_dataset = HyperX(img, val_gt, labeled=True, **vars(args))
     val_loader = data.DataLoader(val_dataset,
                                  batch_size=args.batch_size)
 
@@ -125,13 +130,13 @@ def main():
     train_labeled_gt, train_unlabeled_gt = utils.sample_gt(train_gt, 1/(args.unlabeled_ratio + 1),
                                                            mode=args.sampling_mode)
 
-    train_labeled_dataset = HyperX(img, train_labeled_gt, labeled=True, **args)
+    train_labeled_dataset = HyperX(img, train_labeled_gt, labeled=True, **vars(args))
     train_labeled_loader = data.DataLoader(train_labeled_dataset, batch_size=args.batch_size,
                                    shuffle=True, drop_last=True)
 
-    train_unlabeled_dataset = HyperX(img, train_unlabeled_gt, labeled=False, **args)
+    train_unlabeled_dataset = HyperX(img, train_unlabeled_gt, labeled=False, **vars(args))
     train_unlabeled_loader = data.DataLoader(train_unlabeled_dataset,
-                                             batch_size=args.batch_size*unlabeled_portion,
+                                             batch_size=args.batch_size*args.unlabeled_ratio,
                                              shuffle=True, drop_last=True)
 
 
@@ -143,24 +148,27 @@ def main():
                                                      args.warmup*iterations,
                                                      total_steps)
 
-    utils.display_predictions(convert_to_color(train_labeled_gt), vis,
+    utils.display_predictions(convert_to_color(train_labeled_gt), vis, writer=writer,
                               caption="Labeled train ground truth")
-    utils.display_predictions(convert_to_color(train_unlabeled_gt), vis,
+    utils.display_predictions(convert_to_color(train_unlabeled_gt), vis, writer=writer,
                               caption="Unlabeled train ground truth")
-    utils.display_predictions(convert_to_color(val_gt), vis,
+    utils.display_predictions(convert_to_color(val_gt), vis, writer=writer,
                               caption="Validation ground truth")
 
+    #Check if this actually does anything at all... weights is not called after this so this should be done sooner??
     if args.class_balancing:
         weights_balance = utils.compute_imf_weights(train_gt, args.n_classes,
                                                     args.ignored_labels)
-        hyperparams['weights'] = torch.from_numpy(weights_balance)
+        args.weights = torch.from_numpy(weights_balance)
 
     print(args)
     print("Network :")
+    writer.add_text('Arguments', str(args))
     with torch.no_grad():
         for input, _ in train_labeled_loader:
             break
         summary(model.to(device), input.size()[1:])
+        writer.add_graph(model.to(device), input)
         # We would like to use device=hyperparams['device'] altough we have
         # to wait for torchsummary to be fixed first.
 
@@ -190,15 +198,15 @@ def main():
     prediction[mask] = 0
 
     color_prediction = convert_to_color(prediction)
-    utils.display_predictions(color_prediction, vis, gt=convert_to_color(test_gt),
+    utils.display_predictions(color_prediction, vis, gt=convert_to_color(test_gt), writer=writer,
                               caption="Prediction vs. test ground truth")
 
-    utils.show_results(run_results, vis, label_values=label_values)
+    utils.show_results(run_results, vis, writer=writer, label_values=label_values)
 
     writer.close()
 
 def train(net, optimizer, criterion, labeled_data_loader, unlabeled_data_loader,
-          epoch, threshold, writer, scheduler=None, display_iter=100, device='cpu',
+          epoch, threshold, writer, scheduler=None, display_iter=100, device=torch.device('cpu'),
           display=None, val_loader=None, save=False):
     """
     Training loop to optimize a network for several epochs and a specified loss
@@ -221,8 +229,6 @@ def train(net, optimizer, criterion, labeled_data_loader, unlabeled_data_loader,
 
     if criterion is None:
         raise Exception("Missing criterion. You must specify a loss function.")
-
-    device = torch.device(device)
 
     net.to(device)
 
@@ -338,12 +344,12 @@ def train(net, optimizer, criterion, labeled_data_loader, unlabeled_data_loader,
         writer.add_scalar('test/2.test_loss', val_loss.avg, e)
 
         # Save the weights
-        if e % save_epoch == 0 && save == True:
+        if e % save_epoch == 0 and save == True:
             save_model(net, utils.camel_to_snake(str(net.__class__.__name__)),
                        labeled_data_loader.dataset.name, epoch=e, metric=abs(metric))
 
 
-def val(net, data_loader, device='cpu', supervision='full'):
+def val(net, data_loader, device=torch.device('cpu'), supervision='full'):
     """
     Validate the model on the validation dataset
     """
@@ -363,9 +369,9 @@ def val(net, data_loader, device='cpu', supervision='full'):
             elif supervision == 'semi':
                 outs = net(data)
                 output, rec = outs
-            _, output = torch.max(output, dim=1)
             loss = F.cross_entropy(output, target)
             val_loss.update(loss.item())
+            _, output = torch.max(output, dim=1)
             for out, pred in zip(output.view(-1), target.view(-1)):
                 if out.item() in ignored_labels:
                     continue
@@ -383,17 +389,17 @@ def save_model(model, model_name, dataset_name, **kwargs):
     """
     Save the models weights to a certain folder.
     """
-     model_dir = './checkpoints/' + model_name + "/" + dataset_name + "/"
-     if not os.path.isdir(model_dir):
-         os.makedirs(model_dir, exist_ok=True)
-     if isinstance(model, torch.nn.Module):
-         filename = str(datetime.datetime.now()) + "_epoch{epoch}_{metric:.2f}".format(**kwargs)
-         tqdm.write("Saving neural network weights in {}".format(filename))
-         torch.save(model.state_dict(), model_dir + filename + '.pth')
-     else:
-         filename = str(datetime.datetime.now())
-         tqdm.write("Saving model params in {}".format(filename))
-         joblib.dump(model, model_dir + filename + '.pkl')
+    model_dir = './checkpoints/' + model_name + "/" + dataset_name + "/"
+    if not os.path.isdir(model_dir):
+        os.makedirs(model_dir, exist_ok=True)
+        if isinstance(model, torch.nn.Module):
+            filename = str(datetime.datetime.now()) + "_epoch{epoch}_{metric:.2f}".format(**kwargs)
+            tqdm.write("Saving neural network weights in {}".format(filename))
+            torch.save(model.state_dict(), model_dir + filename + '.pth')
+        else:
+            filename = str(datetime.datetime.now())
+            tqdm.write("Saving model params in {}".format(filename))
+            joblib.dump(model, model_dir + filename + '.pkl')
 
 
 def test(net, img, args):
@@ -429,7 +435,7 @@ def test(net, img, args):
             output = net(data)
             if isinstance(output, tuple):
                 output = output[0]
-            output = output.to(args.device)
+            output = output.to('cpu')
 
             if patch_size == 1 or center_pixel:
                 output = output.numpy()
@@ -557,3 +563,8 @@ class AverageMeter(object):
         self.sum += val * n
         self.count += n
         self.avg = self.sum / self.count
+
+
+if __name__ == '__main__':
+    cudnn.benchmark = True
+    main()
