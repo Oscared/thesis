@@ -65,6 +65,8 @@ def main():
                         help='use to mixture noise data for use')
     parser.add_argument('--results', type=str, default='results',
                         help='where to save results to')
+    parser.add_argument('--save_dir', type=str, default='./checkpoints/',
+                        help='where to save models to')
 
     parser.add_argument('--supervision', type=str, default='full',
                         help='check this more, use to make us of all labeled or not, full or semi')
@@ -74,7 +76,8 @@ def main():
     device = utils.get_device(args.cuda)
     args.device = device
 
-    vis = visdom.Visdom()
+    #vis = visdom.Visdom()
+    vis = None
 
     tensorboard_dir = str(args.results + '/' + str(datetime.datetime.now()))
 
@@ -181,7 +184,7 @@ def main():
               train_unlabeled_loader, args.epochs, writer=writer,
               scheduler=args.scheduler, device=args.device,
               threshold=args.threshold, val_loader=val_loader, display=vis,
-              save=args.save)
+              save=args.save, save_dir=args.save_dir)
     except KeyboardInterrupt:
         # Allow the user to stop the training
         pass
@@ -208,7 +211,7 @@ def main():
 
 def train(net, optimizer, criterion, labeled_data_loader, unlabeled_data_loader,
           epoch, threshold, writer, scheduler=None, display_iter=100, device=torch.device('cpu'),
-          display=None, val_loader=None, save=False):
+          display=None, val_loader=None, save=False, save_dir='./checkpoints/'):
     """
     Training loop to optimize a network for several epochs and a specified loss
     Args:
@@ -347,7 +350,7 @@ def train(net, optimizer, criterion, labeled_data_loader, unlabeled_data_loader,
         # Save the weights
         if e % save_epoch == 0 and save == True:
             save_model(net, utils.camel_to_snake(str(net.__class__.__name__)),
-                       labeled_data_loader.dataset.name, epoch=e, metric=abs(metric))
+                       labeled_data_loader.dataset.name, save_dir, epoch=e, metric=abs(metric))
 
 
 def val(net, data_loader, device=torch.device('cpu'), supervision='full'):
@@ -386,11 +389,11 @@ def val(net, data_loader, device=torch.device('cpu'), supervision='full'):
     return accuracy / total, val_loss
 
 
-def save_model(model, model_name, dataset_name, **kwargs):
+def save_model(model, model_name, dataset_name, save_dir, **kwargs):
     """
     Save the models weights to a certain folder.
     """
-    model_dir = './checkpoints/' + model_name + "/" + dataset_name + "/"
+    model_dir = save_dir + model_name + "/" + dataset_name + "/"
     if not os.path.isdir(model_dir):
         os.makedirs(model_dir, exist_ok=True)
         if isinstance(model, torch.nn.Module):

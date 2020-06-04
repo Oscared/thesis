@@ -82,22 +82,24 @@ def convert_from_color_(arr_3d, palette=None):
     return arr_2d
 
 
-def display_predictions(pred, vis, gt=None, writer=None, caption=""):
+def display_predictions(pred, vis=None, gt=None, writer=None, caption=""):
     if gt is None:
-        vis.images([np.transpose(pred, (2, 0, 1))],
-                    opts={'caption': caption})
+        if vis is not None:
+            vis.images([np.transpose(pred, (2, 0, 1))],
+                       opts={'caption': caption})
         if writer is not None:
             writer.add_image(caption, np.transpose(pred, (2, 0, 1)))
     else:
-        vis.images([np.transpose(pred, (2, 0, 1)),
-                    np.transpose(gt, (2, 0, 1))],
-                    nrow=2,
-                    opts={'caption': caption})
+        if vis is not None:
+            vis.images([np.transpose(pred, (2, 0, 1)),
+                        np.transpose(gt, (2, 0, 1))],
+                        nrow=2,
+                        opts={'caption': caption})
         if writer is not None:
             writer.add_images(caption, np.array([np.transpose(pred, (2, 0, 1)),
                         np.transpose(gt, (2, 0, 1))]))
 
-def display_dataset(img, gt, bands, labels, palette, vis, writer=None):
+def display_dataset(img, gt, bands, labels, palette, vis=None, writer=None):
     """Display the specified dataset.
     Args:
         img: 3D hyperspectral image
@@ -115,8 +117,9 @@ def display_dataset(img, gt, bands, labels, palette, vis, writer=None):
     # Display the RGB composite image
     caption = "RGB (bands {}, {}, {})".format(*bands)
     # send to visdom server
-    vis.images([np.transpose(rgb, (2, 0, 1))],
-                opts={'caption': caption})
+    if vis is not None:
+        vis.images([np.transpose(rgb, (2, 0, 1))],
+                    opts={'caption': caption})
     if writer is not None:
         writer.add_image(caption, np.transpose(rgb, (2, 0, 1)))
 
@@ -329,7 +332,7 @@ def metrics(prediction, target, ignored_labels=[], n_classes=None):
     return results
 
 
-def show_results(results, vis, writer=None, label_values=None, agregated=False):
+def show_results(results, vis=None, writer=None, label_values=None, agregated=False):
     text = ""
 
     if agregated:
@@ -348,12 +351,6 @@ def show_results(results, vis, writer=None, label_values=None, agregated=False):
         kappa = results["Kappa"]
 
     #label_values = label_values[1:]
-    vis.heatmap(cm, opts={'title': "Confusion matrix",
-                          'marginbottom': 150,
-                          'marginleft': 150,
-                          'width': 500,
-                          'height': 500,
-                          'rownames': label_values, 'columnnames': label_values})
     text += "Confusion matrix :\n"
     text += str(cm)
     text += "---\n"
@@ -381,7 +378,15 @@ def show_results(results, vis, writer=None, label_values=None, agregated=False):
     else:
         text += "Kappa: {:.03f}\n".format(kappa)
 
-    vis.text(text.replace('\n', '<br/>'))
+    if vis is not None:
+        vis.heatmap(cm, opts={'title': "Confusion matrix",
+                              'marginbottom': 150,
+                              'marginleft': 150,
+                              'width': 500,
+                              'height': 500,
+                              'rownames': label_values,
+                              'columnnames': label_values})
+        vis.text(text.replace('\n', '<br/>'))
     print(text)
     if writer is not None:
         writer.add_text('Results', text)
