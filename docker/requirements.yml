@@ -5,5 +5,5 @@ dependencies:
   - seaborn
   - spectral
   - scipy
-  - imageio
-  - 
+  - imageio 
+  - pytorch==1.4.0

@@ -17,7 +17,7 @@ except ImportError:
 
 from utils import open_file
 
-dataset_path = "/home/oscar/Desktop/Exjobb/Data/"
+dataset_path = "/data/"
 
 class TqdmUpTo(tqdm):
     """Provides `update_to(n)` which uses `tqdm.update(delta_n)`."""
@@ -152,9 +152,9 @@ class HyperX(torch.utils.data.Dataset):
         #np.random.shuffle(self.indices)
 
         self.class_var = {}
-        for class in np.unique(self.gt):
+        for c in np.unique(self.label):
             if c not in self.ignored_labels:
-                l_indices = np.nonzero(self.labels==class)
+                l_indices = np.nonzero(self.labels==c)
                 pos = self.indices[l_indices]
                 var = np.var(self.data[pos[:,0], pos[:,1]], axis=0)
                 self.class_var[c] = np.diag(var)

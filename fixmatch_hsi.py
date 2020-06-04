@@ -12,13 +12,14 @@ from torch.optim.lr_scheduler import LambdaLR
 import torch.optim as optim
 from torch.nn import init
 import torch.utils.data as data
-from torchsummary import summary
-from torch.utils.tensorboard  import SummaryWriter
+#from torchsummary import summary
+#from torch.utils.tensorboard  import SummaryWriter
+from tensorboardX import SummaryWriter
 
 import math
 import os
 import datetime
-import joblib
+#import joblib
 from tqdm import tqdm
 import argparse
 
@@ -26,7 +27,7 @@ def main():
     parser = argparse.ArgumentParser(description="Hyperspectral image classification with FixMatch")
     parser.add_argument('--patch_size', type=int, default=5,
                         help='Size of patch around each pixel taken for classification')
-    parser.add_argument('--center_pixel', action='store_true', default=True,
+    parser.add_argument('--center_pixel', action='store_false',
                         help='use if you only want to consider the label of the center pixel of a patch')
     parser.add_argument('--batch_size', type=int, default=64,
                         help='Size of each batch for training')
@@ -40,7 +41,7 @@ def main():
                         help='warmup epochs')
     parser.add_argument('--threshold', type=float, default=0.95,
                         help='confidence threshold for pseudo labels')
-    parser.add_argument('--save', action='store_true', default=False,
+    parser.add_argument('--save', action='store_true',
                         help='use to save model weights when running')
     parser.add_argument('--test_stride', type=int, default=1,
                         help='length of stride when sliding patch window over image for testing')
@@ -52,15 +53,15 @@ def main():
                         help='initial learning rate')
     parser.add_argument('--unlabeled_ratio', type=int, default=7,
                         help='ratio of unlabeled data to labeled (spliting the training data into these ratios)')
-    parser.add_argument('--class_balancing', action='store_true', default=True,
+    parser.add_argument('--class_balancing', action='store_true',
                         help='use to balance weights according to ratio in dataset')
     parser.add_argument('--checkpoint', type=str, default=None,
                         help='use to load model weights from a certain directory')
-    parser.add_argument('--flip_augmentation', action='store_true', default=True,
+    parser.add_argument('--flip_augmentation', action='store_true',
                         help='use to flip augmentation data for use')
-    parser.add_argument('--radiation_augmentation', action='store_true', default=True,
+    parser.add_argument('--radiation_augmentation', action='store_true',
                         help='use to radiation noise data for use')
-    parser.add_argument('--mixture_augmentation', action='store_true', default=True,
+    parser.add_argument('--mixture_augmentation', action='store_true',
                         help='use to mixture noise data for use')
     parser.add_argument('--results', type=str, default='results',
                         help='where to save results to')
@@ -167,7 +168,7 @@ def main():
     with torch.no_grad():
         for input, _ in train_labeled_loader:
             break
-        summary(model.to(device), input.size()[1:])
+        #summary(model.to(device), input.size()[1:])
         writer.add_graph(model.to(device), input)
         # We would like to use device=hyperparams['device'] altough we have
         # to wait for torchsummary to be fixed first.
@@ -399,7 +400,7 @@ def save_model(model, model_name, dataset_name, **kwargs):
         else:
             filename = str(datetime.datetime.now())
             tqdm.write("Saving model params in {}".format(filename))
-            joblib.dump(model, model_dir + filename + '.pkl')
+            #joblib.dump(model, model_dir + filename + '.pkl')
 
 
 def test(net, img, args):
