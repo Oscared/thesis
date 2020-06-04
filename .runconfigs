@@ -1,5 +1,5 @@
 # NVIDIA-Docker run options
-docker_args: -v /multiverse/datasets/ornberg:/data
+docker_args: -v /multiverse/datasets/ornberg:/data -v ~/storage:/saves
 
 # Run script options
 # To run the container multiple times
@@ -7,5 +7,5 @@ num_iters: 1
 # The name of containers (remember you have to prefix it with '{user}_')
 container_name: {user}_SSL_HSI_GPU{args.gpu}_{date}
 # The docker image to use 
-image_name: ornberg/dl:cudo10_pytorch_py36
+image_name: ornberg/dl:cuda10_pytorch_py36
 

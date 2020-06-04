@@ -172,7 +172,7 @@ def main():
         for input, _ in train_labeled_loader:
             break
         #summary(model.to(device), input.size()[1:])
-        writer.add_graph(model.to(device), input)
+        #writer.add_graph(model.to(device), input)
         # We would like to use device=hyperparams['device'] altough we have
         # to wait for torchsummary to be fixed first.
 

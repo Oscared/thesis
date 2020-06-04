@@ -162,8 +162,8 @@ class HyperX(torch.utils.data.Dataset):
         if self.pca_aug:
             centered_data = self.data - np.mean(self.data)
             data_train, _ = utils.build_dataset(centered_data, self.label, ignored_labels = self.ignored_labels)
-            pca = PCA(n_components=11)
-            pca.fit(data_train)
+            self.pca = PCA(n_components=11)
+            self.pca.fit(data_train)
 
 
     @staticmethod
@@ -195,12 +195,12 @@ class HyperX(torch.utils.data.Dataset):
                 data2[idx] = self.data[x,y]
         return (alpha1 * data + alpha2 * data2) / (alpha1 + alpha2) + beta * noise
 
-    def pca_augmentation(data, strength=1):
+    def pca_augmentation(self, data, strength=1):
         data_train = data - np.mean(data)
         alpha = strength*np.random.uniform(0.9,1.1, np.shape(data)[0])
-        data_pca = pca.transform(data_train)
+        data_pca = self.pca.transform(data_train)
         data_pca[:,0] = data_pca[:,0]*alpha
-        data_aug = pca.inverse_transform(data_pca)
+        data_aug = self.pca.inverse_transform(data_pca)
         return data_aug
 
     def __len__(self):

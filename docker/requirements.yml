@@ -6,4 +6,4 @@ dependencies:
   - spectral
   - scipy
   - imageio 
-  - pytorch==1.4.0
+  - joblib
