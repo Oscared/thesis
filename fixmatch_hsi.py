@@ -306,19 +306,20 @@ def train(net, optimizer, criterion, labeled_data_loader, unlabeled_data_loader,
                                        100. * batch_idx / len(labeled_data_loader),
                                        mean_losses[iter_])
                 update = None if loss_win is None else 'append'
-                loss_win = display.line(
-                    X=np.arange(iter_ - display_iter, iter_),
-                    Y=mean_losses[iter_ - display_iter:iter_],
-                    win=loss_win,
-                    update=update,
-                    opts={'title': "Training loss",
-                          'xlabel': "Iterations",
-                          'ylabel': "Loss"
-                         }
-                )
+                if display is not None:
+                    loss_win = display.line(
+                        X=np.arange(iter_ - display_iter, iter_),
+                        Y=mean_losses[iter_ - display_iter:iter_],
+                        win=loss_win,
+                        update=update,
+                        opts={'title': "Training loss",
+                            'xlabel': "Iterations",
+                            'ylabel': "Loss"
+                             })
+                             
                 tqdm.write(string)
 
-                if len(val_accuracies) > 0:
+                if len(val_accuracies) > 0 and display is not None:
                     val_win = display.line(Y=np.array(val_accuracies),
                                            X=np.arange(len(val_accuracies)),
                                            win=val_win,
