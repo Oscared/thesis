@@ -67,6 +67,9 @@ def main():
                         help='where to save results to')
     parser.add_argument('--save_dir', type=str, default='./checkpoints/',
                         help='where to save models to')
+    parser.add_argument('--data_dir', type=str, default='/data/',
+                        help='where to fetch data from')
+
 
     parser.add_argument('--supervision', type=str, default='full',
                         help='check this more, use to make us of all labeled or not, full or semi')
@@ -84,7 +87,7 @@ def main():
     os.makedirs(tensorboard_dir, exist_ok=True)
     writer = SummaryWriter(tensorboard_dir)
 
-    img, gt, label_values, ignored_labels, rgb_bands, palette = get_dataset(args.dataset)
+    img, gt, label_values, ignored_labels, rgb_bands, palette = get_dataset(args.dataset, target_folder=args.data_dir)
 
     args.n_classes = len(label_values)
     args.n_bands = img.shape[-1]

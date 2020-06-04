@@ -7,6 +7,7 @@ import os
 from tqdm import tqdm
 from sklearn import preprocessing
 from sklearn.decomposition import PCA
+import utils
 
 try:
     # Python 3
@@ -159,11 +160,11 @@ class HyperX(torch.utils.data.Dataset):
                 var = np.var(self.data[pos[:,0], pos[:,1]], axis=0)
                 self.class_var[c] = np.diag(var)
 
-        if self.pca_aug:
-            centered_data = self.data - np.mean(self.data)
-            data_train, _ = utils.build_dataset(centered_data, self.label, ignored_labels = self.ignored_labels)
-            self.pca = PCA(n_components=11)
-            self.pca.fit(data_train)
+
+        centered_data = self.data - np.mean(self.data)
+        data_train, _ = utils.build_dataset(centered_data, self.label, ignored_labels = self.ignored_labels)
+        self.pca = PCA(n_components=11)
+        self.pca.fit(data_train)
 
 
     @staticmethod
@@ -195,12 +196,16 @@ class HyperX(torch.utils.data.Dataset):
                 data2[idx] = self.data[x,y]
         return (alpha1 * data + alpha2 * data2) / (alpha1 + alpha2) + beta * noise
 
-    def pca_augmentation(self, data, strength=1):
-        data_train = data - np.mean(data)
-        alpha = strength*np.random.uniform(0.9,1.1, np.shape(data)[0])
-        data_pca = self.pca.transform(data_train)
-        data_pca[:,0] = data_pca[:,0]*alpha
-        data_aug = self.pca.inverse_transform(data_pca)
+    #PCA augmentation technique. Adds noise in pca space and transform back
+    def pca_augmentation(self, data, label, strength=1):
+        data_aug = np.zeros_like(data)
+        data_train = data - np.mean(self.data)
+        for idx, _ in np.ndenumerate(label):
+            x,y = idx
+            alpha = strength*np.random.uniform(0.9,1.1)
+            data_pca = self.pca.transform(data_train[x,y,:].reshape(1,-1))
+            data_pca[:,0] = data_pca[:,0]*alpha
+            data_aug[x,y,:] = self.pca.inverse_transform(data_pca)
         return data_aug
 
     def __len__(self):
@@ -270,7 +275,7 @@ class HyperX(torch.utils.data.Dataset):
             if np.random.rand() < 0.7:
                 data_strong = self.mixture_noise(data_strong, label_strong)
             if np.random.rand() < 0.7:
-                data_strong = self.pca_augmentation(data_strong, strength=1.1)
+                data_strong = self.pca_augmentation(data_strong, label_strong, strength=1.1)
 
             # Copy the data into numpy arrays (PyTorch doesn't like numpy views)
             data_weak = np.asarray(np.copy(data_weak).transpose((2, 0, 1)), dtype='float32')
