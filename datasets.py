@@ -279,8 +279,8 @@ class HyperX(torch.utils.data.Dataset):
                 data_strong = self.radiation_noise(data_strong)
             if np.random.rand() < 0.7:
                 data_strong = self.mixture_noise(data_strong, label_strong)
-            #if np.random.rand() < 0.7:
-                #data_strong = self.pca_augmentation(data_strong, label_strong, strength=1.1)
+            if np.random.rand() < 0.7:
+                data_strong = self.pca_augmentation(data_strong, label_strong, strength=1.1)
 
             # Copy the data into numpy arrays (PyTorch doesn't like numpy views)
             data_weak = np.asarray(np.copy(data_weak).transpose((2, 0, 1)), dtype='float32')

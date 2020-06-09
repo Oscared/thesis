@@ -143,13 +143,13 @@ def main():
 
     train_labeled_dataset = HyperX(img, train_labeled_gt, labeled=True, **vars(args))
     train_labeled_loader = data.DataLoader(train_labeled_dataset, batch_size=args.batch_size,
-                                   #pin_memory=True, num_workers=5,
+                                   pin_memory=True, num_workers=5,
                                    shuffle=True, drop_last=True)
 
     train_unlabeled_dataset = HyperX(img, train_unlabeled_gt, labeled=False, **vars(args))
     train_unlabeled_loader = data.DataLoader(train_unlabeled_dataset,
                                              batch_size=args.batch_size*args.unlabeled_ratio,
-                                             #pin_memory=True, num_workers=5,
+                                             pin_memory=True, num_workers=5,
                                              shuffle=True, drop_last=True)
 
 
@@ -178,7 +178,7 @@ def main():
         #weights[torch.LongTensor(args.ignored_labels)] = 0
         args.weights = weights
 
-    args.weights.to(device)
+    args.weights = args.weights.to(args.device)
     loss_labeled = nn.CrossEntropyLoss(weight=args.weights)
     loss_unlabeled = nn.CrossEntropyLoss(weight=args.weights, reduction='none')
     loss_val = nn.CrossEntropyLoss(weight=args.weights)
