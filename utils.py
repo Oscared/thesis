@@ -174,6 +174,35 @@ def plot_spectrums(spectrums, vis, title=""):
         win = vis.line(X=np.arange(n_bands), Y=v, name=k, win=win, update=update,
                        opts={'title': title})
 
+def plot_confusion_matrix(cm, class_names):
+  """
+  Returns a matplotlib figure containing the plotted confusion matrix.
+
+  Args:
+    cm (array, shape = [n, n]): a confusion matrix of integer classes
+    class_names (array, shape = [n]): String names of the integer classes
+  """
+  figure = plt.figure(figsize=(8, 8))
+  plt.imshow(cm, interpolation='nearest', cmap=plt.cm.Blues)
+  plt.title("Confusion matrix")
+  plt.colorbar()
+  tick_marks = np.arange(len(class_names))
+  plt.xticks(tick_marks, class_names, rotation=45)
+  plt.yticks(tick_marks, class_names)
+
+  # Normalize the confusion matrix.
+  cm = np.around(cm.astype('float') / cm.sum(axis=1)[:, np.newaxis], decimals=2)
+
+  # Use white text if squares are dark; otherwise black.
+  threshold = cm.max() / 2.
+  for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
+    color = "white" if cm[i, j] > threshold else "black"
+    plt.text(j, i, cm[i, j], horizontalalignment="center", color=color)
+
+  plt.tight_layout()
+  plt.ylabel('True label')
+  plt.xlabel('Predicted label')
+  return figure
 
 def build_dataset(mat, gt, ignored_labels=None):
     """Create a list of training samples based on an image and a mask.
@@ -289,8 +318,8 @@ def metrics(prediction, target, ignored_labels=[], n_classes=None):
     for l in ignored_labels:
         ignored_mask[target == l] = True
     ignored_mask = ~ignored_mask
-    #target = target[ignored_mask] -1
-    target = target[ignored_mask]
+    target = target[ignored_mask] - 1
+    #target = target[ignored_mask]
     prediction = prediction[ignored_mask]
 
     results = {}
@@ -368,7 +397,7 @@ def show_results(results, vis=None, writer=None, label_values=None, agregated=Fa
                                      F1_scores_std):
             text += "\t{}: {:.03f} +- {:.03f}\n".format(label, score, std)
     else:
-        for label, score in zip(label_values, F1scores):
+        for label, score in zip(label_values[1:], F1scores):
             text += "\t{}: {:.03f}\n".format(label, score)
     text += "---\n"
 
@@ -389,6 +418,7 @@ def show_results(results, vis=None, writer=None, label_values=None, agregated=Fa
         vis.text(text.replace('\n', '<br/>'))
     print(text)
     if writer is not None:
+        writer.add_figure('Confusion matrix', plot_confusion_matrix(cm, label_values[1:]))
         writer.add_text('Results', text)
 
 
@@ -434,17 +464,31 @@ def sample_gt(gt, train_size, mode='random'):
     elif mode == 'disjoint':
         train_gt = np.copy(gt)
         test_gt = np.copy(gt)
+        #Ratio list for storing possible division ratios
+        ratios = np.zeros(gt.shape[0])
         for c in np.unique(gt):
             mask = gt == c
             for x in range(gt.shape[0]):
                 first_half_count = np.count_nonzero(mask[:x, :])
                 second_half_count = np.count_nonzero(mask[x:, :])
+                #Make this to make sure we get division of each class
+                ratio = first_half_count / ( first_half_count + second_half_count )
+                ratios[x] = ratio
+                '''
                 try:
                     ratio = first_half_count / ( first_half_count + second_half_count )
                     if ratio > 0.9 * train_size and ratio < 1.1 * train_size:
                         break
                 except ZeroDivisionError:
                     continue
+                '''
+            #This is the best index possible with the given train_size
+            one_mask = np.multiply(ratios, ratios != 1)
+            ratios_masked = ratios[np.nonzero(one_mask)]
+            min_ratios = ratios_masked[np.argmin(np.abs(ratios_masked - train_size))]
+            x = np.nonzero(ratios == min_ratios)
+            x = int(x[0])
+
             mask[:x, :] = 0
             train_gt[mask] = 0
 

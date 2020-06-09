@@ -150,7 +150,8 @@ class HyperX(torch.utils.data.Dataset):
         p = self.patch_size // 2
         self.indices = np.array([(x,y) for x,y in zip(x_pos, y_pos) if x > p and x < data.shape[0] - p and y > p and y < data.shape[1] - p])
         self.labels = [self.label[x,y] for x,y in self.indices]
-        #np.random.shuffle(self.indices)
+        self.indices_shuffle = np.copy(self.indices)
+        np.random.shuffle(self.indices_shuffle)
 
         self.class_var = {}
         for c in np.unique(self.label):
@@ -192,6 +193,9 @@ class HyperX(torch.utils.data.Dataset):
                 l_indices = np.nonzero(self.labels == value)[0]
                 l_indice = np.random.choice(l_indices)
                 assert(self.labels[l_indice] == value)
+                #This is the original implementation, but I think it takes the wrong data
+                #x, y = self.indices_shuffle[l_indice]
+                #This is the new implementaiton, it does not mix indices and should take the right sample              
                 x, y = self.indices[l_indice]
                 data2[idx] = self.data[x,y]
         return (alpha1 * data + alpha2 * data2) / (alpha1 + alpha2) + beta * noise
@@ -200,19 +204,20 @@ class HyperX(torch.utils.data.Dataset):
     def pca_augmentation(self, data, label, strength=1):
         data_aug = np.zeros_like(data)
         data_train = data - np.mean(self.data)
-        for idx, _ in np.ndenumerate(label):
-            x,y = idx
-            alpha = strength*np.random.uniform(0.9,1.1)
-            data_pca = self.pca.transform(data_train[x,y,:].reshape(1,-1))
-            data_pca[:,0] = data_pca[:,0]*alpha
-            data_aug[x,y,:] = self.pca.inverse_transform(data_pca)
+        for idx, value in np.ndenumerate(label):
+            if value not in self.ignored_labels:
+                x,y = idx
+                alpha = strength*np.random.uniform(0.9,1.1)
+                data_pca = self.pca.transform(data_train[x,y,:].reshape(1,-1))
+                data_pca[:,0] = data_pca[:,0]*alpha
+                data_aug[x,y,:] = self.pca.inverse_transform(data_pca)
         return data_aug
 
     def __len__(self):
         return len(self.indices)
 
     def __getitem__(self, i):
-        x, y = self.indices[i]
+        x, y = self.indices_shuffle[i]
         x1, y1 = x - self.patch_size // 2, y - self.patch_size // 2
         x2, y2 = x1 + self.patch_size, y1 + self.patch_size
 
@@ -274,8 +279,8 @@ class HyperX(torch.utils.data.Dataset):
                 data_strong = self.radiation_noise(data_strong)
             if np.random.rand() < 0.7:
                 data_strong = self.mixture_noise(data_strong, label_strong)
-            if np.random.rand() < 0.7:
-                data_strong = self.pca_augmentation(data_strong, label_strong, strength=1.1)
+            #if np.random.rand() < 0.7:
+                #data_strong = self.pca_augmentation(data_strong, label_strong, strength=1.1)
 
             # Copy the data into numpy arrays (PyTorch doesn't like numpy views)
             data_weak = np.asarray(np.copy(data_weak).transpose((2, 0, 1)), dtype='float32')
