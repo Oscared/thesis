@@ -195,7 +195,7 @@ class HyperX(torch.utils.data.Dataset):
                 assert(self.labels[l_indice] == value)
                 #This is the original implementation, but I think it takes the wrong data
                 #x, y = self.indices_shuffle[l_indice]
-                #This is the new implementaiton, it does not mix indices and should take the right sample              
+                #This is the new implementaiton, it does not mix indices and should take the right sample
                 x, y = self.indices[l_indice]
                 data2[idx] = self.data[x,y]
         return (alpha1 * data + alpha2 * data2) / (alpha1 + alpha2) + beta * noise
@@ -212,6 +212,55 @@ class HyperX(torch.utils.data.Dataset):
                 data_pca[:,0] = data_pca[:,0]*alpha
                 data_aug[x,y,:] = self.pca.inverse_transform(data_pca)
         return data_aug
+
+    #Cutout augmentation, cut out a random part of the image and replace with ignored label
+    #this is the vanilla implementation, might not work for this case because
+    #of the middle pixel. The middle pixel should not be cut out since it is everything
+    #[0 0 0 0 0]
+    #[0 0 0 0 0]
+    #[0 0 P 0 0]
+    #[0 0 0 0 0]
+    #[0 0 0 0 0]
+    #fucked up augmentation purely made for 5x5 patches...
+    def cutout_hsi(image):
+        cutout_image = image
+        y = np.random.choice([-1,0,1])
+        if y == 0:
+            x = np.random.choice([-1,1])
+            x_step = 2*x
+            x1 = np.min(x, x_step)
+            x2 = np.max(x, x_step)
+
+            y_step = np.random.choice([-1,1])
+            y1 = np.min(y, y_step)
+            y2 = np.max(y, y_step)
+        else:
+            x = np.random.choice([-1,0,1])
+            if x == 0:
+                x_step = np.random.choice([-1,1])
+                x1 = np.min(x, x_step)
+                x2 = np.max(x, x_step)
+            else:
+                x_step = 2*x
+                x1 = np.min(x, x_step)
+                x2 = np.max(x, x_step)
+            y_step = 2*y
+            y1 = np.min(y, y_step)
+            y2 = np.max(y, y_step)
+        cutout_image[y1:y2,x1:x2,:] = 0
+        return cutout_image
+    def cutout(image, size=2, n_squares=1):
+        h, w, channels = image.shape
+        new_image = image
+        for _ in range(n_squares):
+            y = np.random.randint(h)
+            x = np.random.randint(w)
+            y1 = np.clip(y - size // 2, 0, h)
+            y2 = np.clip(y + size // 2, 0, h)
+            x1 = np.clip(x - size // 2, 0, w)
+            x2 = np.clip(x + size // 2, 0, w)
+            new_image[y1:y2,x1:x2,:] = 0
+        return new_image
 
     def __len__(self):
         return len(self.indices)

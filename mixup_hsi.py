@@ -7,19 +7,20 @@ import seaborn as sns
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torch.backends.cudnn as cudnn
 from torch.optim.lr_scheduler import LambdaLR
 import torch.optim as optim
 from torch.nn import init
-import torch.backends.cudnn as cudnn
 from torch.autograd import Variable
 import torch.utils.data as data
-from torchsummary import summary
-from torch.utils.tensorboard  import SummaryWriter
+#from torchsummary import summary
+#from torch.utils.tensorboard  import SummaryWriter
+from tensorboardX import SummaryWriter
 
 import math
 import os
 import datetime
-from sklearn.externals import joblib
+#import joblib
 from tqdm import tqdm
 import argparse
 
@@ -27,7 +28,7 @@ def main():
     parser = argparse.ArgumentParser(description="Hyperspectral image classification with FixMatch")
     parser.add_argument('--patch_size', type=int, default=5,
                         help='Size of patch around each pixel taken for classification')
-    parser.add_argument('--center_pixel', action='store_true', default=False,
+    parser.add_argument('--center_pixel', action='store_false',
                         help='use if you only want to consider the label of the center pixel of a patch')
     parser.add_argument('--batch_size', type=int, default=64,
                         help='Size of each batch for training')
@@ -35,50 +36,61 @@ def main():
                         help='number of total epochs of training to run')
     parser.add_argument('--dataset', type=str, default='Salinas',
                         help='Name of dataset to run, Salinas or PaviaU')
-    parser.add_argument('--device', type=str, default='cpu',
-                        help='what device to run on, cpu or gpu')
+    parser.add_argument('--cuda', type=int, default=-1,
+                        help='what CUDA device to run on, -1 defaults to cpu')
     parser.add_argument('--warmup', type=float, default=0,
                         help='warmup epochs')
-    parser.add_argument('--save', action='store_true', default=False,
+    parser.add_argument('--save', action='store_true',
                         help='use to save model weights when running')
-    parser.add_argument('--test_stride', type=int, default=3,
+    parser.add_argument('--test_stride', type=int, default=1,
                         help='length of stride when sliding patch window over image for testing')
     parser.add_argument('--sampling_percentage', type=float, default=0.3,
                         help='percentage of dataset to sample for training (labeled and unlabeled included)')
-    parser.add_argument('-sampling_mode', type=str, default='disjoint',
+    parser.add_argument('--sampling_mode', type=str, default='disjoint',
                         help='how to sample data, disjoint, random, or fixed')
     parser.add_argument('--lr', type=float, default=0.03,
                         help='initial learning rate')
-    parser.add_argument('--class_balancing', action='store_true', default=True,
+    parser.add_argument('--alpha', type=float, default=1.0,
+                        help='beta distribution range')
+    parser.add_argument('--class_balancing', action='store_false',
                         help='use to balance weights according to ratio in dataset')
     parser.add_argument('--checkpoint', type=str, default=None,
                         help='use to load model weights from a certain directory')
-    parser.add_argument('--flip_augmentation', action='store_true', default=True,
+    parser.add_argument('--flip_augmentation', action='store_true',
                         help='use to flip augmentation data for use')
-    parser.add_argument('--radiation_noise', action='store_true', default=True,
+    parser.add_argument('--radiation_augmentation', action='store_true',
                         help='use to radiation noise data for use')
-    parser.add_argument('--mixture_noise', action='store_true', default=True,
+    parser.add_argument('--mixture_augmentation', action='store_true',
                         help='use to mixture noise data for use')
     parser.add_argument('--results', type=str, default='results',
-                        help='where to save results to')
-    parser.add_argument('--alpha', type=float, default=1,
-                        help='mixup interpolation coefficient (default 1)')
+                        help='where to save results to (default results)')
+    parser.add_argument('--save_dir', type=str, default='/saves/',
+                        help='where to save models to (default /saves/)')
+    parser.add_argument('--data_dir', type=str, default='/data/',
+                        help='where to fetch data from (default /data/)')
+    parser.add_argument('--load_file', type=str, default=None,
+                        help='wihch file to load weights from (default None)')
+
 
     parser.add_argument('--supervision', type=str, default='full',
                         help='check this more, use to make us of all labeled or not, full or semi')
 
-    args = parser.parse_arg()
+    args = parser.parse_args()
 
-    vis = visdom.Visdom()
+    device = utils.get_device(args.cuda)
+    args.device = device
 
-    use_cude = torch.cuda.is_available()
+    #vis = visdom.Visdom()
+    vis = None
 
-    os.makedirs(args.out, exist_ok=True)
-    writer = SummaryWriter(args.out)
+    tensorboard_dir = str(args.results + '/' + datetime.datetime.now().strftime("%m-%d-%X"))
 
-    img, gt, label_values, ignored_labels, rgb_bands, palette = get_dataset(args.dataset)
+    os.makedirs(tensorboard_dir, exist_ok=True)
+    writer = SummaryWriter(tensorboard_dir)
 
-    args.n_classes = len(label_values)
+    img, gt, label_values, ignored_labels, rgb_bands, palette = get_dataset(args.dataset, target_folder=args.data_dir)
+
+    args.n_classes = len(label_values) - len(ignored_labels)
     args.n_bands = img.shape[-1]
     args.ignored_labels = ignored_labels
 
@@ -97,84 +109,83 @@ def main():
     train_gt, test_gt = utils.sample_gt(gt, args.sampling_percentage,
                                         mode=args.sampling_mode)
     print("{} samples selected (over {})".format(np.count_nonzero(train_gt), np.count_nonzero(gt)))
+    writer.add_text('Amount of training samples', "{} samples selected (over {})".format(np.count_nonzero(train_gt), np.count_nonzero(gt)))
 
-    utils.display_predictions(convert_to_color(train_gt), vis,
+    utils.display_predictions(convert_to_color(train_gt), vis, writer=writer,
                               caption="Train ground truth")
-    utils.display_predictions(convert_to_color(test_gt), vis,
+    utils.display_predictions(convert_to_color(test_gt), vis, writer=writer,
                               caption="Test ground truth")
-
-    device = torch.device(args.device)
-
-    weights = torch.ones(args.n_classes)
-    weights[torch.LongTensor(args.ignored_labels)] = 0
-    weights = weights.to(device)
 
     model = HamidaEtAl(args.n_bands, args.n_classes,
                        patch_size=args.patch_size)
 
     optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=0.9,
                           nesterov=True)
-    loss = nn.CrossEntropyLoss(weight=weights)
+    #loss_labeled = nn.CrossEntropyLoss(weight=weights)
+    #loss_unlabeled = nn.CrossEntropyLoss(weight=weights, reduction='none')
 
-    train_gt, val_gt = utils.sample_gt(train_gt, 0.95, mode=args.sampling_mode)
+    train_labeled_gt, val_gt = utils.sample_gt(train_gt, 0.95, mode=args.sampling_mode)
 
-    val_dataset = HyperX(img, val_gt, labeled=True, **args)
+    val_dataset = HyperX(img, val_gt, labeled=True, **vars(args))
     val_loader = data.DataLoader(val_dataset,
                                  batch_size=args.batch_size)
 
-    samples = np.count_nonzero(train_gt)
+    writer.add_text('Amount of labeled training samples', "{} samples selected (over {})".format(np.count_nonzero(train_labeled_gt), np.count_nonzero(train_gt)))
+    samples_class = np.zeros(args.n_classes)
+    for c in np.unique(train_labeled_gt):
+        samples_class[c-1] = np.count_nonzero(train_labeled_gt == c)
+    writer.add_text('Labeled samples per class', str(samples_class))
 
-    train_labeled_gt, train_unlabeled_gt = utils.sample_gt(train_gt, 1/(args.unlabeled_ratio + 1),
-                                                           mode=args.sampling_mode)
-
-    train_labeled_dataset = HyperX(img, train_labeled_gt, labeled=True, **args)
-    train_labeled_loader = data.DataLoader(train_labeled_dataset, batch_size=args.batch_size,
+    train_dataset = HyperX(img, train_labeled_gt, labeled=True, **vars(args))
+    train_loader = data.DataLoader(train_dataset, batch_size=args.batch_size,
+                                   #pin_memory=True, num_workers=5,
                                    shuffle=True, drop_last=True)
 
-    train_unlabeled_dataset = HyperX(img, train_unlabeled_gt, labeled=False, **args)
-    train_unlabeled_loader = data.DataLoader(train_unlabeled_dataset,
-                                             batch_size=args.batch_size*unlabeled_portion,
-                                             shuffle=True, drop_last=True)
+    amount_labeled = np.count_nonzero(train_labeled_gt)
 
-
-    amount_labeled = samples // (args.unlabeled_ratio + 1)
-
-    iterations = amount_labeled // args.batch_size
-    total_steps = iterations * args.epochs
+    args.iterations = amount_labeled // args.batch_size
+    args.total_steps = args.iterations * args.epochs
     args.scheduler = get_cosine_schedule_with_warmup(optimizer,
-                                                     args.warmup*iterations,
-                                                     total_steps)
+                                                     args.warmup*args.iterations,
+                                                     args.total_steps)
 
-    utils.display_predictions(convert_to_color(train_labeled_gt), vis,
+    utils.display_predictions(convert_to_color(train_labeled_gt), vis, writer=writer,
                               caption="Labeled train ground truth")
-    utils.display_predictions(convert_to_color(train_unlabeled_gt), vis,
-                              caption="Unlabeled train ground truth")
-    utils.display_predictions(convert_to_color(val_gt), vis,
+    utils.display_predictions(convert_to_color(val_gt), vis, writer=writer,
                               caption="Validation ground truth")
 
     if args.class_balancing:
-        weights_balance = utils.compute_imf_weights(train_gt, args.n_classes,
+        weights_balance = utils.compute_imf_weights(train_gt, len(label_values),
                                                     args.ignored_labels)
-        hyperparams['weights'] = torch.from_numpy(weights_balance)
+        args.weights = torch.from_numpy(weights_balance[1:])
+        args.weights = args.weights.to(torch.float32)
+    else:
+        weights = torch.ones(args.n_classes)
+        #weights[torch.LongTensor(args.ignored_labels)] = 0
+        args.weights = weights
+
+    args.weights = args.weights.to(args.device)
+    criterion = nn.CrossEntropyLoss(weight=args.weights)
+    loss_val = nn.CrossEntropyLoss(weight=args.weights)
 
     print(args)
     print("Network :")
+    writer.add_text('Arguments', str(args))
     with torch.no_grad():
-        for input, _ in train_labeled_loader:
+        for input, _ in train_loader:
             break
-        summary(model.to(device), input.size()[1:])
+        #summary(model.to(device), input.size()[1:])
+        #writer.add_graph(model.to(device), input)
         # We would like to use device=hyperparams['device'] altough we have
         # to wait for torchsummary to be fixed first.
 
-    if args.checkpoint is not None:
-        model.load_state_dict(torch.load(args.checkpoint))
+    if args.load_file is not None:
+        model.load_state_dict(torch.load(args.load_file))
+    model.zero_grad()
 
     try:
-        train(model, optimizer, loss, train_labeled_loader,
-              train_unlabeled_loader, args.epochs, writer=writer,
-              scheduler=args.scheduler, device=args.device,
-              threshold=args.threshold, val_loader=val_loader, display=vis,
-              save=args.save)
+        train(model, optimizer, criterion, loss_val, train_loader,
+              writer, args, val_loader=val_loader, display=vis)
     except KeyboardInterrupt:
         # Allow the user to stop the training
         pass
@@ -189,19 +200,19 @@ def main():
     mask = np.zeros(gt.shape, dtype='bool')
     for l in args.ignored_labels:
         mask[gt == l] = True
+    prediction += 1
     prediction[mask] = 0
 
     color_prediction = convert_to_color(prediction)
-    utils.display_predictions(color_prediction, vis, gt=convert_to_color(test_gt),
+    utils.display_predictions(color_prediction, vis, gt=convert_to_color(test_gt), writer=writer,
                               caption="Prediction vs. test ground truth")
 
-    utils.show_results(run_results, vis, label_values=label_values)
+    utils.show_results(run_results, vis, writer=writer, label_values=label_values)
 
     writer.close()
 
-def train(net, optimizer, criterion, train_loader, epoch,
-          writer, scheduler=None, display_iter=100, device='cpu',
-          display=None, val_loader=None, save=False):
+def train(net, optimizer, criterion_labeled, criterion_val, train_loader,
+          writer, args, display_iter=10, display=None, val_loader=None):
     """
     Training loop to optimize a network for several epochs and a specified loss
     Args:
@@ -209,7 +220,8 @@ def train(net, optimizer, criterion, train_loader, epoch,
         optimizer: a PyTorch optimizer
         train_loader: a PyTorch dataset loader for the labeled dataset
         epoch: int specifying the number of training epochs
-        criterion: a PyTorch-compatible loss function, e.g. nn.CrossEntropyLoss
+        threshold: probability thresold for pseudo labels acceptance
+        criterion_labeled: a PyTorch-compatible loss function, e.g. nn.CrossEntropyLoss
         device (optional): torch device to use (defaults to CPU)
         display_iter (optional): number of iterations before refreshing the
         display (False/None to switch off).
@@ -218,14 +230,15 @@ def train(net, optimizer, criterion, train_loader, epoch,
         supervision (optional): 'full' or 'semi'
     """
 
-    if criterion is None:
+    save_dir = args.save_dir
+
+
+    if criterion_labeled is None:
         raise Exception("Missing criterion. You must specify a loss function.")
 
-    device = torch.device(device)
+    net.to(args.device)
 
-    net.to(device)
-
-    save_epoch = epoch // 20 if epoch > 20 else 1
+    save_epoch = args.epochs // 20 if args.epochs > 20 else 1
 
 
     losses = np.zeros(1000000)
@@ -234,61 +247,72 @@ def train(net, optimizer, criterion, train_loader, epoch,
     loss_win, val_win = None, None
     val_accuracies = []
 
-    for e in tqdm(range(1, epoch + 1), desc="Training the network"):
+    for e in tqdm(range(1, args.epochs + 1), desc="Training the network"):
         # Set the network to training mode
         net.train()
         avg_loss = 0.
 
         losses_meter = AverageMeter()
+        train_loss = 0
+        correct = 0
+        total = 0
 
         # Run the training loop for one epoch
-        for batch_idx, (data, target) in tqdm(enumerate(train_loader), total=len(train_loader)):
+        for batch_idx, (data, targets) in tqdm(enumerate(train_loader), total=len(train_loader)):
+            targets = targets - 1
 
             batch_size = data.shape[0]
             # Load the data into the GPU if required
-            data, targets = data.to(device), targets.to(device)
+            data = data.to(args.device)
+            targets = targets.to(args.device)
 
-            data, target_a, target_b, lam = mixup_data(data, targets, args.alpha, use_cuda)
-            data, target_a, target_b = map(Variable, (data, target_a, target_b))
+            inputs, targets_a, targets_b, lam = mixup_data(data, targets,
+                                                           args.alpha, args.device)
+            inputs, targets_a, targets_b = map(Variable, (inputs,
+                                               targets_a, targets_b))
 
-            logits = net(data)
+            outputs = net(inputs)
+            loss = mixup_criterion(criterion_labeled, outputs, targets_a, targets_b, lam)
 
-            loss = mixup_criterion(criterion, logits, target_a, target_b, lam)
+            train_loss += loss.item()
+            _, predicted = torch.max(outputs.data, 1)
+            total += targets.size(0)
+            correct += (lam * predicted.eq(targets_a.data).to('cpu').sum().float()
+                        + (1 - lam) * predicted.eq(targets_b.data).to('cpu').sum().float())
 
-            _, predicted = torch.max(logits.data, 1)
-            mask += (lam * predicted.eq(targets_a.data).cpu().sum().float()
-                    + (1 - lam) * predicted.eq(targets_b.data).cpu().sum().float())
 
             optimizer.zero_grad()
+
             loss.backward()
             optimizer.step()
+            args.scheduler.step()
 
-            losses_meter.update(loss.data[0])
-
-            avg_loss += loss.item()
-            losses[iter_] = loss.item()
-            mean_losses[iter_] = np.mean(losses[max(0, iter_ - 100):iter_ + 1])
+            losses_meter.update(loss.item())
 
             if display_iter and iter_ % display_iter == 0:
-                string = 'Train (epoch {}/{}) [{}/{} ({:.0f}%)]\tLoss: {:.6f}'
-                string = string.format(e, epoch, batch_idx * len(data_x),
-                                       len(data_x) * len(labeled_data_loader),
-                                       100. * batch_idx / len(labeled_data_loader),
-                                       mean_losses[iter_])
+                string = 'Train (epoch {}/{}) [Iter: {:4}/{:4}]\tLr: {:.6f}\tLoss: {:.4f}\tAcc: {:.4f} ({:.4f}/{:.4f})'
+                string = string.format(e, args.epochs, batch_idx + 1,
+                                       args.iterations, args.scheduler.get_last_lr()[0],
+                                       train_loss/(batch_idx+1), 100.*correct/total, correct, total)
                 update = None if loss_win is None else 'append'
-                loss_win = display.line(
-                    X=np.arange(iter_ - display_iter, iter_),
-                    Y=mean_losses[iter_ - display_iter:iter_],
-                    win=loss_win,
-                    update=update,
-                    opts={'title': "Training loss",
-                          'xlabel': "Iterations",
-                          'ylabel': "Loss"
-                         }
-                )
-                tqdm.write(string)
+                if display is not None:
+                    loss_win = display.line(
+                        X=np.arange(iter_ - display_iter, iter_),
+                        Y=mean_losses[iter_ - display_iter:iter_],
+                        win=loss_win,
+                        update=update,
+                        opts={'title': "Training loss",
+                            'xlabel': "Iterations",
+                            'ylabel': "Loss"
+                             })
 
-                if len(val_accuracies) > 0:
+                tqdm.write(string)
+                '''
+                for name, param in net.named_parameters():
+                    if param.requires_grad:
+                        print(name, torch.min(param.data), torch.max(param.data))
+                '''
+                if len(val_accuracies) > 0 and display is not None:
                     val_win = display.line(Y=np.array(val_accuracies),
                                            X=np.arange(len(val_accuracies)),
                                            win=val_win,
@@ -297,32 +321,28 @@ def train(net, optimizer, criterion, train_loader, epoch,
                                                  'ylabel': "Accuracy"
                                                 })
             iter_ += 1
+            del(inputs, targets)
 
         # Update the scheduler
-        avg_loss /= len(labeled_data_loader)
+        avg_loss /= len(train_loader)
         if val_loader is not None:
-            val_acc, val_loss = val(net, val_loader, device=device, supervision='full')
-            val_accuracies.append(val_acc)
-            metric = -val_acc
+            val_acc, val_loss = val(net, val_loader, criterion_val, device=args.device, supervision='full')
+            #val_accuracies.append(val_acc)
+            #metric = -val_acc
         else:
             metric = avg_loss
 
-        if isinstance(scheduler, optim.lr_scheduler.ReduceLROnPlateau):
-            scheduler.step(metric)
-        elif scheduler is not None:
-            scheduler.step()
-
         writer.add_scalar('train/1.train_loss', losses_meter.avg, e)
-        writer.add_scalar('test/1.test_acc', val_acc, e)
+        writer.add_scalar('test/1.test_acc', val_acc.avg, e)
         writer.add_scalar('test/2.test_loss', val_loss.avg, e)
 
         # Save the weights
-        if e % save_epoch == 0 && save == True:
+        if e % save_epoch == 0 and args.save == True:
             save_model(net, utils.camel_to_snake(str(net.__class__.__name__)),
-                       labeled_data_loader.dataset.name, epoch=e, metric=abs(metric))
+                       train_loader.dataset.name, args.save_dir, epoch=args.epochs, metric=abs(-val_acc.avg))
 
 
-def val(net, data_loader, device='cpu', supervision='full'):
+def val(net, data_loader, loss_val, device=torch.device('cpu'), supervision='full'):
     """
     Validate the model on the validation dataset
     """
@@ -337,42 +357,44 @@ def val(net, data_loader, device='cpu', supervision='full'):
         with torch.no_grad():
             # Load the data into the GPU if required
             data, target = data.to(device), target.to(device)
+            # Try to remove prediction for ignored class
+            target = target - 1
             if supervision == 'full':
                 output = net(data)
             elif supervision == 'semi':
                 outs = net(data)
                 output, rec = outs
-            _, output = torch.max(output, dim=1)
-            loss = F.cross_entropy(output, target)
+            loss = loss_val(output, target)
             val_loss.update(loss.item())
+            _, output = torch.max(output, dim=1)
             for out, pred in zip(output.view(-1), target.view(-1)):
                 if out.item() in ignored_labels:
                     continue
                 else:
                     accuracy += out.item() == pred.item()
-                    val_acc.update(accuracy)
+                    val_acc.update(out.item() == pred.item())
                     total += 1
                     """
                     Check this more to see if the loss is correct!
                     """
-    return accuracy / total, val_loss
+    return val_acc, val_loss
 
 
-def save_model(model, model_name, dataset_name, **kwargs):
+def save_model(model, model_name, dataset_name, save_dir, **kwargs):
     """
     Save the models weights to a certain folder.
     """
-     model_dir = './checkpoints/' + model_name + "/" + dataset_name + "/"
-     if not os.path.isdir(model_dir):
-         os.makedirs(model_dir, exist_ok=True)
-     if isinstance(model, torch.nn.Module):
-         filename = str(datetime.datetime.now()) + "_epoch{epoch}_{metric:.2f}".format(**kwargs)
-         tqdm.write("Saving neural network weights in {}".format(filename))
-         torch.save(model.state_dict(), model_dir + filename + '.pth')
-     else:
-         filename = str(datetime.datetime.now())
-         tqdm.write("Saving model params in {}".format(filename))
-         joblib.dump(model, model_dir + filename + '.pkl')
+    model_dir = save_dir + model_name + "/" + dataset_name + "/"
+    if not os.path.isdir(model_dir):
+        os.makedirs(model_dir, exist_ok=True)
+    if isinstance(model, torch.nn.Module):
+        filename = str(datetime.datetime.now()) + "_epoch{epoch}_{metric:.2f}".format(**kwargs)
+        tqdm.write("Saving neural network weights in {}".format(filename))
+        torch.save(model.state_dict(), model_dir + filename + '.pth')
+    else:
+        filename = str(datetime.datetime.now())
+        tqdm.write("Saving model params in {}".format(filename))
+        joblib.dump(model, model_dir + filename + '.pkl')
 
 
 def test(net, img, args):
@@ -408,7 +430,7 @@ def test(net, img, args):
             output = net(data)
             if isinstance(output, tuple):
                 output = output[0]
-            output = output.to(args.device)
+            output = output.to('cpu')
 
             if patch_size == 1 or center_pixel:
                 output = output.numpy()
@@ -535,10 +557,12 @@ class AverageMeter(object):
         self.val = val
         self.sum += val * n
         self.count += n
-        self.avg = self.sum / self.count
+        if self.count != 0:
+            self.avg = self.sum / self.count
+        else:
+            self.avg = 0
 
-
-def mixup_data(x, y, alpha=1.0, use_cuda=False):
+def mixup_data(x, y, alpha=1.0, device='cpu'):
     """
     Returns mixed inputs, pairs of targets, and lambda
     """
@@ -549,10 +573,7 @@ def mixup_data(x, y, alpha=1.0, use_cuda=False):
 
     batch_size = x.size()[0]
 
-    if use_cuda:
-        index = torch.randperm(batch_size).cuda()
-    else:
-        index = torch.randperm(batch_size)
+    index = torch.randperm(batch_size).to(device)
 
     mixed_x = lam * x + (1 - lam) * x[index, :]
     y_a, y_b = y, y[index]
@@ -563,3 +584,8 @@ def mixup_criterion(criterion, pred, y_a, y_b, lam):
     Returns the mixup loss based on a certain loss function (criterion)
     """
     return lam * criterion(pred, y_a) + (1 - lam) * criterion(pred, y_b)
+
+
+if __name__ == '__main__':
+    cudnn.benchmark = True
+    main()
