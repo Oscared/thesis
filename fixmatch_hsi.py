@@ -64,11 +64,11 @@ def main():
     parser.add_argument('--mixture_augmentation', action='store_true',
                         help='use to mixture noise data for use')
     parser.add_argument('--results', type=str, default='results',
-                        help='where to save results to')
-    parser.add_argument('--save_dir', type=str, default='./checkpoints/',
-                        help='where to save models to')
+                        help='where to save results to (default results)')
+    parser.add_argument('--save_dir', type=str, default='/saves/',
+                        help='where to save models to (default /saves/)')
     parser.add_argument('--data_dir', type=str, default='/data/',
-                        help='where to fetch data from')
+                        help='where to fetch data from (default /data/)')
     parser.add_argument('--load_file', type=str, default=None,
                         help='wihch file to load weights from (default None)')
 
