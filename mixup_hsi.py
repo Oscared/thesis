@@ -138,7 +138,7 @@ def main():
 
     train_dataset = HyperX(img, train_labeled_gt, labeled=True, **vars(args))
     train_loader = data.DataLoader(train_dataset, batch_size=args.batch_size,
-                                   #pin_memory=True, num_workers=5,
+                                   pin_memory=True, num_workers=5,
                                    shuffle=True, drop_last=True)
 
     amount_labeled = np.count_nonzero(train_labeled_gt)
