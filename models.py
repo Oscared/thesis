@@ -89,3 +89,21 @@ class HamidaEtAl(nn.Module):
         x = self.dropout(x)
         x = self.fc(x)
         return x
+
+class NalepaEtAl(nn.Module):
+    @staticmethod
+    def weight_init(m):
+        init.kaiming_normal_(m.weight)
+        init.zeros_(m.bias)
+
+    def __init__(self, input_channels, n_classes):
+        super(NalepaEtAl, self).__init__()
+
+        self.input_channels = input_channels
+        self.conv = nn.Conv1d(1, 200, 5)
+        self.bn = nn.BatchNorm1d(200)
+        self.pool = nn.MaxPool(2)
+        self.fc1 = nn.Linear( ,512)
+        self.fc2 = nn.Linear(512, 128)
+        self.fc3 = nn.Linear(128,n_classes)
+        

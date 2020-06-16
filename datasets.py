@@ -40,8 +40,7 @@ def get_dataset(dataset_name, target_folder=dataset_path):
     """ Gets the dataset specified by name and return the related components.
     Args:
         dataset_name: string with the name of the dataset
-        target_folder (optional): folder to store the datasets, defaults to ./
-        datasets (optional): dataset configuration dictionary, defaults to prebuilt one
+        target_folder (optional): folder to store the datasets, defaults to /data/
     Returns:
         img: 3D hyperspectral image (WxHxB)
         gt: 2D int array of labels
@@ -111,6 +110,99 @@ def get_dataset(dataset_name, target_folder=dataset_path):
     return img, gt, label_values, ignored_labels, rgb_bands, palette
 
 
+def get_patch_data(dataset_name, patch_size, target_folder=dataset_path, fold=0):
+    """ Get data from patch based extraction from Nalepa et al
+    Args:
+        dataset_name: string with the name of the dataset (salinas, pavia, indiana)
+        patch_size: size of patches to extract
+        target_folder (optional): folder to store the datasets, defaults to /data/
+        fold (optional): which fold of the split to use, defaults to 0 (0-4 for salinas and pavia, 0-3 for indiana)
+    Returns:
+        train_img: list of 3D hyperspectral image patches (PxWxHxB) for training
+        train_gt: list of 2D int array of labels for training
+        test_patch: 3D hyperspectral image (WxHxB) for testing
+        test_gt: list of 2D int array of labels for testing
+        label_values: list of class names
+        ignored_labels: list of int classes to ignore
+        rgb_bands: int tuple that correspond to red, green and blue bands
+    """
+    palette = None
+
+    train_patches = []
+    train_patches_gt = []
+
+    dataset_name = dataset_name.lower()
+
+    if dataset_name not in ['salinas', 'pavia', 'indiana']:
+        print('Error: Dataset is not available')
+
+    for i in (range(int((len(os.listdir(target_folder + '/{}_fold_{}/'.format(dataset_name, fold)))-3)/2))):
+        #train_patches[i] = np.load(data_path + '/salinas_fold_0/patch_{}.npy'.format(i))
+        #train_gt[i] = np.load(data_path + '/salinas_fold_0/patch_{}_gt.npy'.format(i))
+
+        train_patches.append(np.load(target_folder + '/{}_fold_{}/patch_{}.npy'.format(dataset_name, fold, i)))
+        train_patches_gt.append(np.load(target_folder + '/{}_fold_{}/patch_{}_gt.npy'.format(dataset_name, fold, i)))
+
+    test_img = np.load(target_folder + '/{}_fold_{}/test.npy'.format(dataset_name, fold))
+    test_img_gt = np.load(target_folder + '/{}_fold_{}/test_gt.npy'.format(dataset_name, fold))
+
+    pad_width = patch_size // 2
+
+    train_img = np.pad(train_patches, ((0,0), (pad_width, pad_width), (pad_width, pad_width), (0,0)))
+    train_gt = np.pad(train_patches_gt, ((0,0), (pad_width, pad_width), (pad_width, pad_width)))
+    test_patch = np.pad(test_img, ((pad_width, pad_width), (pad_width, pad_width), (0,0)))
+    test_gt = np.pad(test_img_gt, ((pad_width, pad_width), (pad_width, pad_width)))
+
+    train_img = np.asarray(train_img, dtype='float32')
+    test_patch = np.asarray(test_patch, dtype='float32')
+    #Normalize test and train
+    """
+    #This scales all bands seperatly, results in high values of some bands in test to be large
+    scaler = preprocessing.MinMaxScaler()
+    data = train_img.reshape(np.prod(train_img.shape[:3]), np.prod(train_img.shape[3:]))
+    data = scaler.fit_transform(data)
+    train_img = data.reshape(train_img.shape)
+
+    data_test = test_patch.reshape(np.prod(test_patch.shape[:2]), np.prod(test_patch.shape[2:]))
+    data_test = scaler.transform(data_test)
+    test_patch = data_test.reshape(test_patch.shape)
+    """
+    #Normalize both with the training set to get [0,1] on training and use same normalization on test (whole image/dataset, not per band)
+    train_img = (train_img - np.min(train_img))/(np.max(train_img) - np.min(train_img))
+    test_patch = (test_patch - np.min(train_img))/(np.max(train_img) - np.min(train_img))
+
+    if dataset_name == 'pavia':
+        rgb_bands = (55, 41, 12)
+        label_values = ['Undefined', 'Asphalt', 'Meadows', 'Gravel', 'Trees',
+                        'Painted metal sheets', 'Bare Soil', 'Bitumen',
+                        'Self-Blocking Bricks', 'Shadows']
+        ignored_labels = [0]
+
+    elif dataset_name == 'salinas':
+        rgb_bands = (43, 21, 11)  # AVIRIS sensor
+        label_values = ["Undefined", "Brocoli_green_weeds_1", "Brocoli_green_weeds_2", "Fallow",
+                        "Fallow_rough_plow", "Fallow_smooth", "Stubble",
+                        "Celery", "Grapes_untrained", "Soil_vinyard_develop",
+                        "Corn_senesced_green_weeds", "Lettuce_romaine_4wk", "Lettuce_romaine_5wk",
+                        "Lettuce_romaine_6wk", "Lettuce_romaine_7wk", "Vinyard_untrained",
+                        "Vinyard_vertical_trellis"]
+        ignored_labels = [0]
+    else:
+        print("Error: no dataset of the requested type found. Available datasets are PaviaU, Salinas.")
+
+    return train_img, train_gt, test_patch, test_gt, label_values, ignored_labels, rgb_bands, palette
+
+    """
+    train_img = []
+    train_gt = []
+
+    kwargs = {'step': 1, 'window_size': (patch_size, patch_size), 'with_data': True}
+
+    for i in range(len(train_patches)):
+        for data, x,y,_,_ in enumerate(utils.sliding_window(train_patches[i], **kwargs)):
+
+    """
+
 class HyperX(torch.utils.data.Dataset):
     """ Generic class for a hyperspectral scene """
 
@@ -148,7 +240,8 @@ class HyperX(torch.utils.data.Dataset):
             mask = np.ones_like(gt)
         x_pos, y_pos = np.nonzero(mask)
         p = self.patch_size // 2
-        self.indices = np.array([(x,y) for x,y in zip(x_pos, y_pos) if x > p and x < data.shape[0] - p and y > p and y < data.shape[1] - p])
+        #Note: added that x and y could equal p as well since positions on array are zero indexed
+        self.indices = np.array([(x,y) for x,y in zip(x_pos, y_pos) if x >= p and x < data.shape[0] - p and y >= p and y < data.shape[1] - p])
         self.labels = [self.label[x,y] for x,y in self.indices]
         self.indices_shuffle = np.copy(self.indices)
         np.random.shuffle(self.indices_shuffle)
@@ -315,6 +408,276 @@ class HyperX(torch.utils.data.Dataset):
         data augmentation.
         """
         if self.labeled == False:
+            data_weak = self.data[x1:x2, y1:y2]
+            data_strong = np.copy(data_weak)
+            label_weak = self.label[x1:x2, y1:y2]
+            label_strong = np.copy(label_weak)
+
+            if self.flip_augmentation and self.patch_size > 1:
+                # Perform data augmentation (only on 2D patches)
+                data_weak, label_weak = self.flip(data_weak, label_weak)
+                data_strong, label_strong = self.flip(data_strong, label_strong)
+            if np.random.rand() < 0.7:
+                data_strong = self.radiation_noise(data_strong)
+            if np.random.rand() < 0.7:
+                data_strong = self.mixture_noise(data_strong, label_strong)
+            if np.random.rand() < 0.7:
+                data_strong = self.pca_augmentation(data_strong, label_strong, strength=1.1)
+
+            # Copy the data into numpy arrays (PyTorch doesn't like numpy views)
+            data_weak = np.asarray(np.copy(data_weak).transpose((2, 0, 1)), dtype='float32')
+
+            data_strong = np.asarray(np.copy(data_strong).transpose((2, 0, 1)), dtype='float32')
+
+            # Load the data into PyTorch tensors
+            data_weak = torch.from_numpy(data_weak)
+            data_strong = torch.from_numpy(data_strong)
+
+            # Add a fourth dimension for 3D CNN
+            if self.patch_size > 1:
+                # Make 4D data ((Batch x) Planes x Channels x Width x Height)
+                data_weak = data_weak.unsqueeze(0)
+                data_strong = data_strong.unsqueeze(0)
+            return data_weak, data_strong
+
+def get_pixel_idx(data, gt, ignored_labels, patch_size):
+    """
+    Args:
+        data: list of 3D HSI patches
+        gt: list of 2D array of labels
+    Output:
+        idx_sup: list of indexes for supervised data
+        idx_val: list of indexes for validation data
+        idx_unsup: list of indexes for unsupervised data
+    """
+    mask = np.ones_like(gt)
+    for l in ignored_labels:
+        mask[gt == l] = 0
+    patch_labeled, x_labeled, y_labeled = np.nonzero(mask)
+
+    for l in ignored_labels:
+        patch_unlabeled, x_unlabeled, y_unlabeled = np.nonzero(mask==l)
+
+    p = patch_size // 2
+    idx_sup = np.array([(p_l, x_l, y_l) for p_l, x_l, y_l in zip(patch_labeled, x_labeled, y_labeled) if x_l >= p and x_l < data.shape[0] - p and y_l >= p and y_l < data.shape[1] - p])
+
+    idx_unsup = np.array([(p_u, x_u, y_u) for p_u, x_u, y_u in zip(patch_unlabeled, x_unlabeled, y_unlabeled) if x_u >= p and x_u < data.shape[0] - p and y_u >= p and y_u < data.shape[1] - p])
+
+class HyperX_patches(torch.utils.data.Dataset):
+    """ Generic class for a hyperspectral scene with list of 3D HSI """
+
+    def __init__(self, data, gt, labeled=True, pca_aug=False, **args):
+        """
+        Args:
+            data: list of 3D hyperspectral image patches
+            gt: list of 2D array of labels
+            patch_size: int, size of the spatial neighbourhood
+            center_pixel: bool, set to True to consider only the label of the
+                          center pixel
+            data_augmentation: bool, set to True to perform random flips
+            supervision: 'full' or 'semi' supervised algorithms
+        """
+        super(HyperX, self).__init__()
+        self.data = np.array(data)
+        self.label = np.array(gt)
+        self.patch_size = args['patch_size']
+        self.name = args['dataset']
+        self.ignored_labels = set(args['ignored_labels'])
+        self.flip_augmentation = args['flip_augmentation']
+        self.radiation_augmentation = args['radiation_augmentation']
+        self.mixture_augmentation = args['mixture_augmentation']
+        self.center_pixel = args['center_pixel']
+        self.labeled = labeled
+        self.pca_aug = pca_aug
+
+        mask = np.ones_like(self.label)
+        for l in self.ignored_labels:
+            mask[self.label == l] = 0
+        patch_labeled, x_labeled, y_labeled = np.nonzero(mask)
+
+        for l in self.ignored_labels:
+            patch_unlabeled, x_unlabeled, y_unlabeled = np.nonzero(mask==l)
+
+        p = self.patch_size // 2
+        self.indices_labled = np.array([(p_l, x_l, y_l) for p_l, x_l, y_l in zip(patch_labeled, x_labeled, y_labeled) if x_l >= p and x_l < data.shape[0] - p and y_l >= p and y_l < data.shape[1] - p])
+        self.labels = [self.label[p_l, x_l, y_l] for p_l, x_l, y_l in self.indices_labeled]
+
+        self.indices_unlabled = np.array([(p_u, x_u, y_u) for p_u, x_u, y_u in zip(patch_unlabeled, x_unlabeled, y_unlabeled) if x_u >= p and x_u < data.shape[0] - p and y_u >= p and y_u < data.shape[1] - p])
+
+        self.indices_labeled_shuffle = np.copy(self.indices_labeled)
+        self.indices_unlabeled_shuffle = np.copy(self.indices_unlabeled)
+
+        np.random.shuffle(self.indices_labeled_shuffle)
+        np.random.shuffle(self.indices_unlabeled_shuffle)
+
+        """
+        self.class_var = {}
+        for c in np.unique(self.label):
+            if c not in self.ignored_labels:
+                l_indices = np.nonzero(self.labels==c)
+                pos = self.indices_labeled[l_indices]
+                var = np.var(self.data[pos[:,0], pos[:,1]], axis=0)
+                self.class_var[c] = np.diag(var)
+        """
+
+        centered_data = self.data - np.mean(self.data, axis=(0,1,2))
+        data_train, _ = np.array([self.data[p_l, x_l, y_l] for p_l, x_l, y_l in zip(patch_labeled, x_labeled, y_labeled) if x_l >= p and x_l < data.shape[0] - p and y_l >= p and y_l < data.shape[1] - p])
+        self.pca = PCA(n_components=11)
+        self.pca.fit(data_train)
+
+
+    @staticmethod
+    def flip(*arrays):
+        horizontal = np.random.random() > 0.5
+        vertical = np.random.random() > 0.5
+        if horizontal:
+            arrays = [np.fliplr(arr) for arr in arrays]
+        if vertical:
+            arrays = [np.flipud(arr) for arr in arrays]
+        return arrays
+
+    @staticmethod
+    def radiation_noise(data, alpha_range=(0.9, 1.1), beta=1/25):
+        alpha = np.random.uniform(*alpha_range)
+        noise = np.random.normal(loc=0., scale=1.0, size=data.shape)
+        return alpha * data + beta * noise
+
+    def mixture_noise(self, data, label, beta=1/25):
+        alpha1, alpha2 = np.random.uniform(0.01, 1., size=2)
+        noise = np.random.normal(loc=0., scale=1.0, size=data.shape)
+        data2 = np.zeros_like(data)
+        for idx, value in np.ndenumerate(label):
+            if value not in self.ignored_labels:
+                l_indices = np.nonzero(self.labels == value)[0]
+                l_indice = np.random.choice(l_indices)
+                assert(self.labels[l_indice] == value)
+                #This is the original implementation, but I think it takes the wrong data
+                #x, y = self.indices_shuffle[l_indice]
+                #This is the new implementaiton, it does not mix indices and should take the right sample
+                x, y = self.indices[l_indice]
+                data2[idx] = self.data[x,y]
+        return (alpha1 * data + alpha2 * data2) / (alpha1 + alpha2) + beta * noise
+
+    #PCA augmentation technique. Adds noise in pca space and transform back
+    def pca_augmentation(self, data, label, strength=1):
+        data_aug = np.zeros_like(data)
+        data_train = data - np.mean(self.data)
+        for idx, value in np.ndenumerate(label):
+            if value not in self.ignored_labels:
+                x,y = idx
+                alpha = strength*np.random.uniform(0.9,1.1)
+                data_pca = self.pca.transform(data_train[x,y,:].reshape(1,-1))
+                data_pca[:,0] = data_pca[:,0]*alpha
+                data_aug[x,y,:] = self.pca.inverse_transform(data_pca)
+        return data_aug
+
+    #Cutout augmentation, cut out a random part of the image and replace with ignored label
+    #this is the vanilla implementation, might not work for this case because
+    #of the middle pixel. The middle pixel should not be cut out since it is everything
+    #[0 0 0 0 0]
+    #[0 0 0 0 0]
+    #[0 0 P 0 0]
+    #[0 0 0 0 0]
+    #[0 0 0 0 0]
+    #fucked up augmentation purely made for 5x5 patches...
+    def cutout_hsi(image):
+        cutout_image = image
+        y = np.random.choice([-1,0,1])
+        if y == 0:
+            x = np.random.choice([-1,1])
+            x_step = 2*x
+            x1 = np.min(x, x_step)
+            x2 = np.max(x, x_step)
+
+            y_step = np.random.choice([-1,1])
+            y1 = np.min(y, y_step)
+            y2 = np.max(y, y_step)
+        else:
+            x = np.random.choice([-1,0,1])
+            if x == 0:
+                x_step = np.random.choice([-1,1])
+                x1 = np.min(x, x_step)
+                x2 = np.max(x, x_step)
+            else:
+                x_step = 2*x
+                x1 = np.min(x, x_step)
+                x2 = np.max(x, x_step)
+            y_step = 2*y
+            y1 = np.min(y, y_step)
+            y2 = np.max(y, y_step)
+        cutout_image[y1:y2,x1:x2,:] = 0
+        return cutout_image
+    def cutout(image, size=2, n_squares=1):
+        h, w, channels = image.shape
+        new_image = image
+        for _ in range(n_squares):
+            y = np.random.randint(h)
+            x = np.random.randint(w)
+            y1 = np.clip(y - size // 2, 0, h)
+            y2 = np.clip(y + size // 2, 0, h)
+            x1 = np.clip(x - size // 2, 0, w)
+            x2 = np.clip(x + size // 2, 0, w)
+            new_image[y1:y2,x1:x2,:] = 0
+        return new_image
+
+    def __len__(self):
+        return len(self.indices)
+
+    def __getitem__(self, i):
+
+        """
+        If the dataset is labeled return data accoring with data augmentation
+        and the ground truth of that specific data.
+        """
+        if self.labeled == True:
+            p, x, y = self.indices_labeled_shuffle[i]
+            x1, y1 = x - self.patch_size // 2, y - self.patch_size // 2
+            x2, y2 = x1 + self.patch_size, y1 + self.patch_size
+
+            data = self.data[p, x1:x2, y1:y2]
+            label = self.label[p, x1:x2, y1:y2]
+
+            if self.flip_augmentation and self.patch_size > 1:
+                # Perform data augmentation (only on 2D patches)
+                data, label = self.flip(data, label)
+            if self.radiation_augmentation and np.random.random() < 0.1:
+                data = self.radiation_noise(data)
+            if self.mixture_augmentation and np.random.random() < 0.2:
+                data = self.mixture_noise(data, label)
+            if self.pca_aug and np.random.random() < 0.2:
+                data = self.pca_augmentation(data)
+
+            # Copy the data into numpy arrays (PyTorch doesn't like numpy views)
+            data = np.asarray(np.copy(data).transpose((2, 0, 1)), dtype='float32')
+            label = np.asarray(np.copy(label), dtype='int64')
+
+            # Load the data into PyTorch tensors
+            data = torch.from_numpy(data)
+            label = torch.from_numpy(label)
+            # Extract the center label if needed
+            if self.center_pixel and self.patch_size > 1:
+                label = label[self.patch_size // 2, self.patch_size // 2]
+            # Remove unused dimensions when we work with invidual spectrums
+            elif self.patch_size == 1:
+                data = data[:, 0, 0]
+                label = label[0, 0]
+
+            # Add a fourth dimension for 3D CNN
+            if self.patch_size > 1:
+                # Make 4D data ((Batch x) Planes x Channels x Width x Height)
+                data = data.unsqueeze(0)
+            return data, label
+
+        """
+        If the data is unlabeled, return one version of the data with weak
+        data augmentation and one version of the same data with strong
+        data augmentation.
+        """
+        if self.labeled == False:
+            p, x, y = self.indices_unlabeled_shuffle[i]
+            x1, y1 = x - self.patch_size // 2, y - self.patch_size // 2
+            x2, y2 = x1 + self.patch_size, y1 + self.patch_size
+
             data_weak = self.data[x1:x2, y1:y2]
             data_strong = np.copy(data_weak)
             label_weak = self.label[x1:x2, y1:y2]
