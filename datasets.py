@@ -168,8 +168,10 @@ def get_patch_data(dataset_name, patch_size, target_folder=dataset_path, fold=0)
     test_patch = data_test.reshape(test_patch.shape)
     """
     #Normalize both with the training set to get [0,1] on training and use same normalization on test (whole image/dataset, not per band)
-    train_img = (train_img - np.min(train_img))/(np.max(train_img) - np.min(train_img))
-    test_patch = (test_patch - np.min(train_img))/(np.max(train_img) - np.min(train_img))
+    min = np.min(train_img)
+    max = np.max(train_img)
+    train_img = (train_img - min)/(max - min)
+    test_patch = (test_patch - min)/(max - min)
 
     if dataset_name == 'pavia':
         rgb_bands = (55, 41, 12)
@@ -459,27 +461,38 @@ def get_pixel_idx(data, gt, ignored_labels, patch_size):
         patch_unlabeled, x_unlabeled, y_unlabeled = np.nonzero(mask==l)
 
     p = patch_size // 2
-    idx_sup = np.array([(p_l, x_l, y_l) for p_l, x_l, y_l in zip(patch_labeled, x_labeled, y_labeled) if x_l >= p and x_l < data.shape[0] - p and y_l >= p and y_l < data.shape[1] - p])
+    idx_labeled = np.array([(p_l, x_l, y_l) for p_l, x_l, y_l in zip(patch_labeled, x_labeled, y_labeled) if x_l >= p and x_l < data.shape[0] - p and y_l >= p and y_l < data.shape[1] - p])
+    np.random.shuffle(idx_labeled)
+
+    ratio = int(0.95*len(idx_labeled))
+
+    idx_sup = idx_labeled[:ratio]
+    idx_val = idx_labeled[ratio:]
 
     idx_unsup = np.array([(p_u, x_u, y_u) for p_u, x_u, y_u in zip(patch_unlabeled, x_unlabeled, y_unlabeled) if x_u >= p and x_u < data.shape[0] - p and y_u >= p and y_u < data.shape[1] - p])
+
+    return idx_sup, idx_val, idx_unsup
+
 
 class HyperX_patches(torch.utils.data.Dataset):
     """ Generic class for a hyperspectral scene with list of 3D HSI """
 
-    def __init__(self, data, gt, labeled=True, pca_aug=False, **args):
+    def __init__(self, data, gt, idx, labeled=True, pca_aug=False, **args):
         """
         Args:
             data: list of 3D hyperspectral image patches
             gt: list of 2D array of labels
+            idx: list of indices from where to pull samples
             patch_size: int, size of the spatial neighbourhood
             center_pixel: bool, set to True to consider only the label of the
                           center pixel
             data_augmentation: bool, set to True to perform random flips
             supervision: 'full' or 'semi' supervised algorithms
         """
-        super(HyperX, self).__init__()
+        super(HyperX_patches, self).__init__()
         self.data = np.array(data)
         self.label = np.array(gt)
+        self.idx = idx
         self.patch_size = args['patch_size']
         self.name = args['dataset']
         self.ignored_labels = set(args['ignored_labels'])
@@ -490,6 +503,8 @@ class HyperX_patches(torch.utils.data.Dataset):
         self.labeled = labeled
         self.pca_aug = pca_aug
 
+
+        """
         mask = np.ones_like(self.label)
         for l in self.ignored_labels:
             mask[self.label == l] = 0
@@ -503,12 +518,12 @@ class HyperX_patches(torch.utils.data.Dataset):
         self.labels = [self.label[p_l, x_l, y_l] for p_l, x_l, y_l in self.indices_labeled]
 
         self.indices_unlabled = np.array([(p_u, x_u, y_u) for p_u, x_u, y_u in zip(patch_unlabeled, x_unlabeled, y_unlabeled) if x_u >= p and x_u < data.shape[0] - p and y_u >= p and y_u < data.shape[1] - p])
+        """
+        if self.labeled == True:
+            self.labels = [self.label[p_l, x_l, y_l] for p_l, x_l, y_l in self.idx]
 
-        self.indices_labeled_shuffle = np.copy(self.indices_labeled)
-        self.indices_unlabeled_shuffle = np.copy(self.indices_unlabeled)
-
-        np.random.shuffle(self.indices_labeled_shuffle)
-        np.random.shuffle(self.indices_unlabeled_shuffle)
+        self.idx_shuffle = np.copy(self.idx)
+        np.random.shuffle(self.idx_shuffle)
 
         """
         self.class_var = {}
@@ -521,7 +536,7 @@ class HyperX_patches(torch.utils.data.Dataset):
         """
 
         centered_data = self.data - np.mean(self.data, axis=(0,1,2))
-        data_train, _ = np.array([self.data[p_l, x_l, y_l] for p_l, x_l, y_l in zip(patch_labeled, x_labeled, y_labeled) if x_l >= p and x_l < data.shape[0] - p and y_l >= p and y_l < data.shape[1] - p])
+        data_train = np.array([self.data[p_l, x_l, y_l] for p_l, x_l, y_l in self.idx])
         self.pca = PCA(n_components=11)
         self.pca.fit(data_train)
 
@@ -554,21 +569,21 @@ class HyperX_patches(torch.utils.data.Dataset):
                 #This is the original implementation, but I think it takes the wrong data
                 #x, y = self.indices_shuffle[l_indice]
                 #This is the new implementaiton, it does not mix indices and should take the right sample
-                x, y = self.indices[l_indice]
-                data2[idx] = self.data[x,y]
+                p, x, y = self.idx[l_indice]
+                data2[idx] = self.data[p,x,y]
         return (alpha1 * data + alpha2 * data2) / (alpha1 + alpha2) + beta * noise
 
     #PCA augmentation technique. Adds noise in pca space and transform back
     def pca_augmentation(self, data, label, strength=1):
         data_aug = np.zeros_like(data)
-        data_train = data - np.mean(self.data)
+        data_train = data - np.mean(self.data, axis=(0,1,2))
         for idx, value in np.ndenumerate(label):
             if value not in self.ignored_labels:
-                x,y = idx
+                p,x,y = idx
                 alpha = strength*np.random.uniform(0.9,1.1)
-                data_pca = self.pca.transform(data_train[x,y,:].reshape(1,-1))
+                data_pca = self.pca.transform(data_train[p,x,y,:].reshape(1,-1))
                 data_pca[:,0] = data_pca[:,0]*alpha
-                data_aug[x,y,:] = self.pca.inverse_transform(data_pca)
+                data_aug[p,x,y,:] = self.pca.inverse_transform(data_pca)
         return data_aug
 
     #Cutout augmentation, cut out a random part of the image and replace with ignored label
@@ -621,7 +636,7 @@ class HyperX_patches(torch.utils.data.Dataset):
         return new_image
 
     def __len__(self):
-        return len(self.indices)
+        return len(self.idx)
 
     def __getitem__(self, i):
 
@@ -630,7 +645,7 @@ class HyperX_patches(torch.utils.data.Dataset):
         and the ground truth of that specific data.
         """
         if self.labeled == True:
-            p, x, y = self.indices_labeled_shuffle[i]
+            p, x, y = self.idx_shuffle[i]
             x1, y1 = x - self.patch_size // 2, y - self.patch_size // 2
             x2, y2 = x1 + self.patch_size, y1 + self.patch_size
 
@@ -674,7 +689,7 @@ class HyperX_patches(torch.utils.data.Dataset):
         data augmentation.
         """
         if self.labeled == False:
-            p, x, y = self.indices_unlabeled_shuffle[i]
+            p, x, y = self.idx_shuffle[i]
             x1, y1 = x - self.patch_size // 2, y - self.patch_size // 2
             x2, y2 = x1 + self.patch_size, y1 + self.patch_size
 

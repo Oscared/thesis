@@ -1,5 +1,5 @@
 import visdom
-from datasets import get_dataset, get_patch_data, HyperX, HyperX_patches
+from datasets import get_dataset, get_patch_data, get_pixel_idx, HyperX, HyperX_patches
 import utils
 import numpy as np
 import seaborn as sns
@@ -24,7 +24,7 @@ import datetime
 from tqdm import tqdm
 import argparse
 
-def main():
+def main(raw_args=None):
     parser = argparse.ArgumentParser(description="Hyperspectral image classification with FixMatch")
     parser.add_argument('--patch_size', type=int, default=5,
                         help='Size of patch around each pixel taken for classification')
@@ -70,12 +70,14 @@ def main():
                         help='wihch file to load weights from (default None)')
     parser.add_argument('--use_vis', action='store_true',
                         help='use to enable Visdom for visualization, remember to start the Visdom server')
+    parser.add_argument('--fold', type=int, default=0,
+                        help='Which fold to sample from if using Nalepas validation scheme')
 
 
     parser.add_argument('--supervision', type=str, default='full',
                         help='check this more, use to make us of all labeled or not, full or semi')
 
-    args = parser.parse_args()
+    args = parser.parse_args(raw_args)
 
     device = utils.get_device(args.cuda)
     args.device = device
@@ -91,7 +93,7 @@ def main():
     writer = SummaryWriter(tensorboard_dir)
 
     if args.sampling_mode == 'nalepa':
-        train_img, train_gt, test_img, test_gt, label_values, ignored_labels, rgb_bands, palette = get_patch_data(args.dataset, args.patch_size, target_folder=args.data_dir)
+        train_img, train_gt, test_img, test_gt, label_values, ignored_labels, rgb_bands, palette = get_patch_data(args.dataset, args.patch_size, target_folder=args.data_dir, fold=args.fold)
         args.n_bands = train_img.shape[-1]
     else:
         img, gt, label_values, ignored_labels, rgb_bands, palette = get_dataset(args.dataset, target_folder=args.data_dir)
@@ -139,38 +141,25 @@ def main():
 
     if args.sampling_mode == 'nalepa':
         #Get fixed amount of random samples for validation
-        idx = set()
-        while len(idx) < 0.05*np.prod(train_gt.shape):
-            p = np.random.randint(train_gt.shape[0])
-            x = np.random.randint(train_gt.shape[1])
-            y = np.random.randint(train_gt.shape[2])
-            if (p,x,y) not in idx:
-                idx.add((p,x,y))
+        idx_sup, idx_val, idx_unsup = get_pixel_idx(train_img, train_gt, args.ignored_labels, args.patch_size)
 
-        #Training data
-        train_labeled = train_img[idx]
-        train_labeled_gt = train_gt[idx]
-        #Validation data. Random subset of 95% of training data
-        mask = np.zeros_like(train_img)
-        mask[idx] = False
-        val_img = train_img[mask]
-        val_gt = train_gt[mask[0:3]]
-
-        writer.add_text('Amount of labeled training samples', "{} samples selected (over {})".format(np.count_nonzero(train_labeled_gt), np.count_nonzero(train_gt)))
+        writer.add_text('Amount of labeled training samples', "{} samples selected (over {})".format(idx_sup.shape[0], np.count_nonzero(train_gt)))
+        train_labeled_gt = [train_gt[p_l, x_l, y_l] for p_l, x_l, y_l in idx_sup]
 
         samples_class = np.zeros(args.n_classes)
         for c in np.unique(train_labeled_gt):
             samples_class[c-1] = np.count_nonzero(train_labeled_gt == c)
         writer.add_text('Labeled samples per class', str(samples_class))
 
-        val_dataset = HyperX_patches(val_img, val_gt, labeled=True, **vars(args))
-        val_loader = data.Dataloader(val_dataset, batch_size=args.batch_size)
+        val_dataset = HyperX_patches(train_img, train_gt, idx_val, labeled=True, **vars(args))
+        val_loader = data.DataLoader(val_dataset, batch_size=args.batch_size)
 
-        train_dataset = HyperX_patches(train_labeled, train_labeled_gt, labeled=True, **vars(args))
+        train_dataset = HyperX_patches(train_img, train_gt, idx_sup, labeled=True, **vars(args))
         train_loader = data.DataLoader(train_dataset, batch_size=args.batch_size,
-                                       pin_memory=True, num_workers=5,
+                                       #pin_memory=True, num_workers=5,
                                        shuffle=True, drop_last=True)
 
+        amount_labeled = idx_sup.shape[0]
     else:
         train_labeled_gt, val_gt = utils.sample_gt(train_gt, 0.95, mode=args.sampling_mode)
 
@@ -185,7 +174,7 @@ def main():
 
         train_dataset = HyperX(img, train_labeled_gt, labeled=True, **vars(args))
         train_loader = data.DataLoader(train_dataset, batch_size=args.batch_size,
-                                       pin_memory=True, num_workers=5,
+                                       #pin_memory=True, num_workers=5,
                                        shuffle=True, drop_last=True)
 
         utils.display_predictions(convert_to_color(train_labeled_gt), vis, writer=writer,
@@ -193,7 +182,7 @@ def main():
         utils.display_predictions(convert_to_color(val_gt), vis, writer=writer,
                                   caption="Validation ground truth")
 
-    amount_labeled = np.count_nonzero(train_labeled_gt)
+        amount_labeled = np.count_nonzero(train_labeled_gt)
 
     args.iterations = amount_labeled // args.batch_size
     args.total_steps = args.iterations * args.epochs
@@ -218,7 +207,6 @@ def main():
     loss_val = nn.CrossEntropyLoss(weight=args.weights)
 
     print(args)
-    print("Network :")
     writer.add_text('Arguments', str(args))
     with torch.no_grad():
         for input, _ in train_loader:
@@ -239,16 +227,19 @@ def main():
         # Allow the user to stop the training
         pass
 
-    probabilities = test(model, img, args)
+    if args.sampling_mode=='nalepa':
+        probabilities = test(model, test_img, args)
+    else:
+        probabilities = test(model, img, args)
     prediction = np.argmax(probabilities, axis=-1)
 
     run_results = utils.metrics(prediction, test_gt,
                                 ignored_labels=args.ignored_labels,
                                 n_classes=args.n_classes)
 
-    mask = np.zeros(gt.shape, dtype='bool')
+    mask = np.zeros(test_gt.shape, dtype='bool')
     for l in args.ignored_labels:
-        mask[gt == l] = True
+        mask[test_gt == l] = True
     prediction += 1
     prediction[mask] = 0
 
@@ -312,23 +303,13 @@ def train(net, optimizer, criterion_labeled, criterion_val, train_loader,
 
             batch_size = data.shape[0]
             # Load the data into the GPU if required
-            data = data.to(args.device)
+            inputs = data.to(args.device)
             targets = targets.to(args.device)
 
-            inputs, targets_a, targets_b, lam = mixup_data(data, targets,
-                                                           args.alpha, args.device)
-            inputs, targets_a, targets_b = map(Variable, (inputs,
-                                               targets_a, targets_b))
-
             outputs = net(inputs)
-            loss = mixup_criterion(criterion_labeled, outputs, targets_a, targets_b, lam)
+            loss = criterion_labeled(outputs, targets)
 
             train_loss += loss.item()
-            _, predicted = torch.max(outputs.data, 1)
-            total += targets.size(0)
-            correct += (lam * predicted.eq(targets_a.data).to('cpu').sum().float()
-                        + (1 - lam) * predicted.eq(targets_b.data).to('cpu').sum().float())
-
 
             optimizer.zero_grad()
 
@@ -339,22 +320,23 @@ def train(net, optimizer, criterion_labeled, criterion_val, train_loader,
             losses_meter.update(loss.item())
 
             if display_iter and iter_ % display_iter == 0:
-                string = 'Train (epoch {}/{}) [Iter: {:4}/{:4}]\tLr: {:.6f}\tLoss: {:.4f}\tAcc: {:.4f} ({:.4f}/{:.4f})'
+                string = 'Train (epoch {}/{}) [Iter: {:4}/{:4}]\tLr: {:.6f}\tLoss: {:.4f}'
                 string = string.format(e, args.epochs, batch_idx + 1,
                                        args.iterations, args.scheduler.get_last_lr()[0],
-                                       train_loss/(batch_idx+1), 100.*correct/total, correct, total)
+                                       train_loss/(batch_idx+1))
                 update = None if loss_win is None else 'append'
                 if display is not None:
+                    """
                     loss_win = display.line(
                         X=np.arange(iter_ - display_iter, iter_),
-                        Y=mean_losses[iter_ - display_iter:iter_],
+                        Y=losses_meter.avg,
                         win=loss_win,
                         update=update,
                         opts={'title': "Training loss",
                             'xlabel': "Iterations",
                             'ylabel': "Loss"
                              })
-
+                    """
                 tqdm.write(string)
                 '''
                 for name, param in net.named_parameters():

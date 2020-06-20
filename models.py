@@ -89,7 +89,7 @@ class HamidaEtAl(nn.Module):
         x = self.dropout(x)
         x = self.fc(x)
         return x
-
+"""
 class NalepaEtAl(nn.Module):
     @staticmethod
     def weight_init(m):
@@ -106,4 +106,5 @@ class NalepaEtAl(nn.Module):
         self.fc1 = nn.Linear( ,512)
         self.fc2 = nn.Linear(512, 128)
         self.fc3 = nn.Linear(128,n_classes)
-        
+
+"""

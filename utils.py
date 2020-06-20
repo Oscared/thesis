@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import random
 import numpy as np
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import confusion_matrix, classification_report
 import sklearn.model_selection
 import seaborn as sns
 import itertools
@@ -340,6 +340,9 @@ def metrics(prediction, target, ignored_labels=[], n_classes=None):
 
     results["Accuracy"] = accuracy
 
+    # Compute a classification report
+    results['Classification Report'] = classification_report(target, prediction)
+
     # Compute F1 score
     F1scores = np.zeros(len(cm))
     for i in range(len(cm)):
@@ -378,6 +381,7 @@ def show_results(results, vis=None, writer=None, label_values=None, agregated=Fa
         accuracy = results["Accuracy"]
         F1scores = results["F1 scores"]
         kappa = results["Kappa"]
+        class_report = results['Classification Report']
 
     #label_values = label_values[1:]
     text += "Confusion matrix :\n"
@@ -413,13 +417,15 @@ def show_results(results, vis=None, writer=None, label_values=None, agregated=Fa
                               'marginleft': 150,
                               'width': 500,
                               'height': 500,
-                              'rownames': label_values,
-                              'columnnames': label_values})
+                              'rownames': label_values[1:],
+                              'columnnames': label_values[1:]})
         vis.text(text.replace('\n', '<br/>'))
     print(text)
+    print(class_report)
     if writer is not None:
         writer.add_figure('Confusion matrix', plot_confusion_matrix(cm, label_values[1:]))
         writer.add_text('Results', text)
+        writer.add_text('Classification Report', class_report)
 
 
 def sample_gt(gt, train_size, mode='random'):
