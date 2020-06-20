@@ -21,7 +21,7 @@ def main():
     for f in range(0,5):
         for r in range(args.runs):
             print('Running: ' + str(r) + 'time and: ' + str(f) + ' fold.')
-            supervised(['--data_dir', '/home/oscar/Desktop/Exjobb/Data/ieee_supplement/Hyperspectral_Grids/{}'.format(args.dataset), '--results', 'results/{}/'.format(args.run_name),'--epochs', '2', '--lr', '0.001', '--batch_size', '10', '--fold={}'.format(f)])
+            supervised(['--data_dir', '/data/ieee_supplement/Hyperspectral_Grids/{}'.format(args.dataset), '--results', 'results/{}/'.format(args.run_name),'--epochs', '20', '--lr', '0.001', '--batch_size', '10', '--fold={}'.format(f), '--cuda', '0', '--flip_augmentation'])
 
     print('Ran all the folds.')
 
