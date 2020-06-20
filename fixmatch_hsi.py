@@ -1,5 +1,5 @@
 import visdom
-from datasets import get_dataset, HyperX
+from datasets import get_dataset, get_patch_data, get_pixel_idx, HyperX, HyperX_patches
 import utils
 import numpy as np
 import seaborn as sns
@@ -23,7 +23,7 @@ import datetime
 from tqdm import tqdm
 import argparse
 
-def main():
+def main(raw_args=None):
     parser = argparse.ArgumentParser(description="Hyperspectral image classification with FixMatch")
     parser.add_argument('--patch_size', type=int, default=5,
                         help='Size of patch around each pixel taken for classification')
@@ -47,7 +47,7 @@ def main():
                         help='length of stride when sliding patch window over image for testing')
     parser.add_argument('--sampling_percentage', type=float, default=0.3,
                         help='percentage of dataset to sample for training (labeled and unlabeled included)')
-    parser.add_argument('--sampling_mode', type=str, default='disjoint',
+    parser.add_argument('--sampling_mode', type=str, default='nalepa',
                         help='how to sample data, disjoint, random, or fixed')
     parser.add_argument('--lr', type=float, default=0.03,
                         help='initial learning rate')
@@ -71,12 +71,14 @@ def main():
                         help='where to fetch data from (default /data/)')
     parser.add_argument('--load_file', type=str, default=None,
                         help='wihch file to load weights from (default None)')
+    parser.add_argument('--fold', type=int, default=0,
+                        help='Which fold to sample from if using Nalepas validation scheme')
 
 
     parser.add_argument('--supervision', type=str, default='full',
                         help='check this more, use to make us of all labeled or not, full or semi')
 
-    args = parser.parse_args()
+    args = parser.parse_args(raw_args)
 
     device = utils.get_device(args.cuda)
     args.device = device
@@ -89,10 +91,14 @@ def main():
     os.makedirs(tensorboard_dir, exist_ok=True)
     writer = SummaryWriter(tensorboard_dir)
 
-    img, gt, label_values, ignored_labels, rgb_bands, palette = get_dataset(args.dataset, target_folder=args.data_dir)
+    if args.sampling_mode == 'nalepa':
+        train_img, train_gt, test_img, test_gt, label_values, ignored_labels, rgb_bands, palette = get_patch_data(args.dataset, args.patch_size, target_folder=args.data_dir, fold=args.fold)
+        args.n_bands = train_img.shape[-1]
+    else:
+        img, gt, label_values, ignored_labels, rgb_bands, palette = get_dataset(args.dataset, target_folder=args.data_dir)
+        args.n_bands = img.shape[-1]
 
     args.n_classes = len(label_values) - len(ignored_labels)
-    args.n_bands = img.shape[-1]
     args.ignored_labels = ignored_labels
 
     if palette is None:
@@ -107,15 +113,22 @@ def main():
     def convert_from_color(x):
         return utils.convert_from_color_(x, palette=invert_palette)
 
-    train_gt, test_gt = utils.sample_gt(gt, args.sampling_percentage,
-                                        mode=args.sampling_mode)
-    print("{} samples selected (over {})".format(np.count_nonzero(train_gt), np.count_nonzero(gt)))
-    writer.add_text('Amount of training samples', "{} samples selected (over {})".format(np.count_nonzero(train_gt), np.count_nonzero(gt)))
+    if args.sampling_mode == 'nalepa':
+        print("{} samples selected (over {})".format(np.count_nonzero(train_gt), np.count_nonzero(train_gt) + np.count_nonzero(test_gt)))
+        writer.add_text('Amount of training samples', "{} samples selected (over {})".format(np.count_nonzero(train_gt), np.count_nonzero(test_gt)))
 
-    utils.display_predictions(convert_to_color(train_gt), vis, writer=writer,
-                              caption="Train ground truth")
-    utils.display_predictions(convert_to_color(test_gt), vis, writer=writer,
-                              caption="Test ground truth")
+        utils.display_predictions(convert_to_color(test_gt), vis, writer=writer,
+                                  caption="Test ground truth")
+    else:
+        train_gt, test_gt = utils.sample_gt(gt, args.sampling_percentage,
+                                            mode=args.sampling_mode)
+        print("{} samples selected (over {})".format(np.count_nonzero(train_gt), np.count_nonzero(gt)))
+        writer.add_text('Amount of training samples', "{} samples selected (over {})".format(np.count_nonzero(train_gt), np.count_nonzero(gt)))
+
+        utils.display_predictions(convert_to_color(train_gt), vis, writer=writer,
+                                    caption="Train ground truth")
+        utils.display_predictions(convert_to_color(test_gt), vis, writer=writer,
+                                    caption="Test ground truth")
 
     model = HamidaEtAl(args.n_bands, args.n_classes,
                        patch_size=args.patch_size)
@@ -125,35 +138,71 @@ def main():
     #loss_labeled = nn.CrossEntropyLoss(weight=weights)
     #loss_unlabeled = nn.CrossEntropyLoss(weight=weights, reduction='none')
 
-    train_gt, val_gt = utils.sample_gt(train_gt, 0.95, mode=args.sampling_mode)
+    if args.sampling_mode == 'nalepa':
+        #Get fixed amount of random samples for validation
+        idx_sup, idx_val, idx_unsup = get_pixel_idx(train_img, train_gt, args.ignored_labels, args.patch_size)
 
-    val_dataset = HyperX(img, val_gt, labeled=True, **vars(args))
-    val_loader = data.DataLoader(val_dataset,
-                                 batch_size=args.batch_size)
+        writer.add_text('Amount of labeled training samples', "{} samples selected (over {})".format(idx_sup.shape[0], np.count_nonzero(train_gt)))
+        train_labeled_gt = [train_gt[p_l, x_l, y_l] for p_l, x_l, y_l in idx_sup]
 
-    train_labeled_gt, train_unlabeled_gt = utils.sample_gt(train_gt, 1/(args.unlabeled_ratio + 1),
-                                                           mode=args.sampling_mode)
+        samples_class = np.zeros(args.n_classes)
+        for c in np.unique(train_labeled_gt):
+            samples_class[c-1] = np.count_nonzero(train_labeled_gt == c)
+        writer.add_text('Labeled samples per class', str(samples_class))
 
-    writer.add_text('Amount of labeled training samples', "{} samples selected (over {})".format(np.count_nonzero(train_labeled_gt), np.count_nonzero(train_gt)))
-    writer.add_text('Amount of unlabeled training samples', "{} samples selected (over {})".format(np.count_nonzero(train_unlabeled_gt), np.count_nonzero(train_gt)))
-    samples_class = np.zeros(args.n_classes)
-    for c in np.unique(train_labeled_gt):
-        samples_class[c-1] = np.count_nonzero(train_labeled_gt == c)
-    writer.add_text('Labeled samples per class', str(samples_class))
+        val_dataset = HyperX_patches(train_img, train_gt, idx_val, labeled=True, **vars(args))
+        val_loader = data.DataLoader(val_dataset, batch_size=args.batch_size)
 
-    train_labeled_dataset = HyperX(img, train_labeled_gt, labeled=True, **vars(args))
-    train_labeled_loader = data.DataLoader(train_labeled_dataset, batch_size=args.batch_size,
-                                   pin_memory=True, num_workers=5,
-                                   shuffle=True, drop_last=True)
+        train_labeled_dataset = HyperX_patches(train_img, train_gt, idx_sup, labeled=True, **vars(args))
+        train_labeled_loader = data.DataLoader(train_labeled_dataset, batch_size=args.batch_size,
+                                       #pin_memory=True, num_workers=5,
+                                       shuffle=True, drop_last=True)
 
-    train_unlabeled_dataset = HyperX(img, train_unlabeled_gt, labeled=False, **vars(args))
-    train_unlabeled_loader = data.DataLoader(train_unlabeled_dataset,
-                                             batch_size=args.batch_size*args.unlabeled_ratio,
-                                             pin_memory=True, num_workers=5,
-                                             shuffle=True, drop_last=True)
+        unlabeled_ratio = math.ceil(len(idx_unsup)/len(idx_sup))
+
+        train_unlabeled_dataset = HyperX_patches(train_img, train_gt, idx_unsup, labeled=False, **vars(args))
+        train_unlabeled_loader = data.DataLoader(train_unlabeled_dataset, batch_size=args.batch_size*unlabeled_ratio,
+                                       #pin_memory=True, num_workers=5,
+                                       shuffle=True, drop_last=True)
+
+        amount_labeled = idx_sup.shape[0]
+    else:
+        train_gt, val_gt = utils.sample_gt(train_gt, 0.95, mode=args.sampling_mode)
+
+        val_dataset = HyperX(img, val_gt, labeled=True, **vars(args))
+        val_loader = data.DataLoader(val_dataset,
+                                    batch_size=args.batch_size)
+
+        train_labeled_gt, train_unlabeled_gt = utils.sample_gt(train_gt, 1/(args.unlabeled_ratio + 1),
+                                                                mode=args.sampling_mode)
+
+        writer.add_text('Amount of labeled training samples', "{} samples selected (over {})".format(np.count_nonzero(train_labeled_gt), np.count_nonzero(train_gt)))
+        writer.add_text('Amount of unlabeled training samples', "{} samples selected (over {})".format(np.count_nonzero(train_unlabeled_gt), np.count_nonzero(train_gt)))
+        samples_class = np.zeros(args.n_classes)
+        for c in np.unique(train_labeled_gt):
+            samples_class[c-1] = np.count_nonzero(train_labeled_gt == c)
+        writer.add_text('Labeled samples per class', str(samples_class))
+
+        train_labeled_dataset = HyperX(img, train_labeled_gt, labeled=True, **vars(args))
+        train_labeled_loader = data.DataLoader(train_labeled_dataset, batch_size=args.batch_size,
+                                                pin_memory=True, num_workers=5,
+                                                shuffle=True, drop_last=True)
+
+        train_unlabeled_dataset = HyperX(img, train_unlabeled_gt, labeled=False, **vars(args))
+        train_unlabeled_loader = data.DataLoader(train_unlabeled_dataset,
+                                                    batch_size=args.batch_size*args.unlabeled_ratio,
+                                                    pin_memory=True, num_workers=5,
+                                                    shuffle=True, drop_last=True)
 
 
-    amount_labeled = np.count_nonzero(train_labeled_gt)
+        amount_labeled = np.count_nonzero(train_labeled_gt)
+
+        utils.display_predictions(convert_to_color(train_labeled_gt), vis, writer=writer,
+                                  caption="Labeled train ground truth")
+        utils.display_predictions(convert_to_color(train_unlabeled_gt), vis, writer=writer,
+                                  caption="Unlabeled train ground truth")
+        utils.display_predictions(convert_to_color(val_gt), vis, writer=writer,
+                                  caption="Validation ground truth")
 
     args.iterations = amount_labeled // args.batch_size
     args.total_steps = args.iterations * args.epochs
@@ -161,12 +210,6 @@ def main():
                                                      args.warmup*args.iterations,
                                                      args.total_steps)
 
-    utils.display_predictions(convert_to_color(train_labeled_gt), vis, writer=writer,
-                              caption="Labeled train ground truth")
-    utils.display_predictions(convert_to_color(train_unlabeled_gt), vis, writer=writer,
-                              caption="Unlabeled train ground truth")
-    utils.display_predictions(convert_to_color(val_gt), vis, writer=writer,
-                              caption="Validation ground truth")
 
     if args.class_balancing:
         weights_balance = utils.compute_imf_weights(train_gt, len(label_values),
@@ -205,16 +248,20 @@ def main():
         # Allow the user to stop the training
         pass
 
-    probabilities = test(model, img, args)
+    if args.sampling_mode=='nalepa':
+        probabilities = test(model, test_img, args)
+    else:
+        probabilities = test(model, img, args)
+
     prediction = np.argmax(probabilities, axis=-1)
 
     run_results = utils.metrics(prediction, test_gt,
                                 ignored_labels=args.ignored_labels,
                                 n_classes=args.n_classes)
 
-    mask = np.zeros(gt.shape, dtype='bool')
+    mask = np.zeros(test_gt.shape, dtype='bool')
     for l in args.ignored_labels:
-        mask[gt == l] = True
+        mask[test_gt == l] = True
     prediction += 1
     prediction[mask] = 0
 

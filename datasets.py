@@ -146,6 +146,12 @@ def get_patch_data(dataset_name, patch_size, target_folder=dataset_path, fold=0)
     test_img = np.load(target_folder + '/{}_fold_{}/test.npy'.format(dataset_name, fold))
     test_img_gt = np.load(target_folder + '/{}_fold_{}/test_gt.npy'.format(dataset_name, fold))
 
+    #Normalize both with the training set to get [0,1] on training and use same normalization on test (whole image/dataset, not per band)
+    min = np.min(train_patches)
+    max = np.max(train_patches)
+    train_patches = (train_patches - min)/(max - min)
+    test_img = (test_img - min)/(max - min)
+
     pad_width = patch_size // 2
 
     train_img = np.pad(train_patches, ((0,0), (pad_width, pad_width), (pad_width, pad_width), (0,0)))
@@ -167,11 +173,6 @@ def get_patch_data(dataset_name, patch_size, target_folder=dataset_path, fold=0)
     data_test = scaler.transform(data_test)
     test_patch = data_test.reshape(test_patch.shape)
     """
-    #Normalize both with the training set to get [0,1] on training and use same normalization on test (whole image/dataset, not per band)
-    min = np.min(train_img)
-    max = np.max(train_img)
-    train_img = (train_img - min)/(max - min)
-    test_patch = (test_patch - min)/(max - min)
 
     if dataset_name == 'pavia':
         rgb_bands = (55, 41, 12)
@@ -461,7 +462,10 @@ def get_pixel_idx(data, gt, ignored_labels, patch_size):
         patch_unlabeled, x_unlabeled, y_unlabeled = np.nonzero(mask==l)
 
     p = patch_size // 2
-    idx_labeled = np.array([(p_l, x_l, y_l) for p_l, x_l, y_l in zip(patch_labeled, x_labeled, y_labeled) if x_l >= p and x_l < data.shape[0] - p and y_l >= p and y_l < data.shape[1] - p])
+    x_patch_size = data[0].shape[0]
+    y_patch_size = data[0].shape[1]
+
+    idx_labeled = np.array([(p_l, x_l, y_l) for p_l, x_l, y_l in zip(patch_labeled, x_labeled, y_labeled) if x_l >= p and x_l < x_patch_size - p and y_l >= p and y_l < y_patch_size - p])
     np.random.shuffle(idx_labeled)
 
     ratio = int(0.95*len(idx_labeled))
@@ -469,7 +473,7 @@ def get_pixel_idx(data, gt, ignored_labels, patch_size):
     idx_sup = idx_labeled[:ratio]
     idx_val = idx_labeled[ratio:]
 
-    idx_unsup = np.array([(p_u, x_u, y_u) for p_u, x_u, y_u in zip(patch_unlabeled, x_unlabeled, y_unlabeled) if x_u >= p and x_u < data.shape[0] - p and y_u >= p and y_u < data.shape[1] - p])
+    idx_unsup = np.array([(p_u, x_u, y_u) for p_u, x_u, y_u in zip(patch_unlabeled, x_unlabeled, y_unlabeled) if x_u >= p and x_u < x_patch_size - p and y_u >= p and y_u < y_patch_size - p])
 
     return idx_sup, idx_val, idx_unsup
 
@@ -577,13 +581,13 @@ class HyperX_patches(torch.utils.data.Dataset):
     def pca_augmentation(self, data, label, strength=1):
         data_aug = np.zeros_like(data)
         data_train = data - np.mean(self.data, axis=(0,1,2))
-        for idx, value in np.ndenumerate(label):
-            if value not in self.ignored_labels:
-                p,x,y = idx
-                alpha = strength*np.random.uniform(0.9,1.1)
-                data_pca = self.pca.transform(data_train[p,x,y,:].reshape(1,-1))
-                data_pca[:,0] = data_pca[:,0]*alpha
-                data_aug[p,x,y,:] = self.pca.inverse_transform(data_pca)
+        for idx, _ in np.ndenumerate(data[:,:,0]):
+            #if value not in self.ignored_labels:
+            x,y = idx
+            alpha = strength*np.random.uniform(0.9,1.1)
+            data_pca = self.pca.transform(data_train[x,y,:].reshape(1,-1))
+            data_pca[:,0] = data_pca[:,0]*alpha
+            data_aug[x,y,:] = self.pca.inverse_transform(data_pca)
         return data_aug
 
     #Cutout augmentation, cut out a random part of the image and replace with ignored label
@@ -693,9 +697,9 @@ class HyperX_patches(torch.utils.data.Dataset):
             x1, y1 = x - self.patch_size // 2, y - self.patch_size // 2
             x2, y2 = x1 + self.patch_size, y1 + self.patch_size
 
-            data_weak = self.data[x1:x2, y1:y2]
+            data_weak = self.data[p, x1:x2, y1:y2]
             data_strong = np.copy(data_weak)
-            label_weak = self.label[x1:x2, y1:y2]
+            label_weak = self.label[p, x1:x2, y1:y2]
             label_strong = np.copy(label_weak)
 
             if self.flip_augmentation and self.patch_size > 1:
@@ -704,8 +708,8 @@ class HyperX_patches(torch.utils.data.Dataset):
                 data_strong, label_strong = self.flip(data_strong, label_strong)
             if np.random.rand() < 0.7:
                 data_strong = self.radiation_noise(data_strong)
-            if np.random.rand() < 0.7:
-                data_strong = self.mixture_noise(data_strong, label_strong)
+            #if np.random.rand() < 0.7:
+                #data_strong = self.mixture_noise(data_strong, label_strong)
             if np.random.rand() < 0.7:
                 data_strong = self.pca_augmentation(data_strong, label_strong, strength=1.1)
 
