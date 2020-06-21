@@ -251,6 +251,8 @@ def main(raw_args=None):
 
     writer.close()
 
+    return run_results
+
 def train(net, optimizer, criterion_labeled, criterion_val, train_loader,
           writer, args, display_iter=10, display=None, val_loader=None):
     """

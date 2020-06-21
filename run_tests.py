@@ -17,16 +17,39 @@ def main():
                         help='What kind of sampling of data to run. random, disjoint, region or patch based. Defaults to patch (nalepa).')
     parser.add_argument('--run_name', type=str, default='mixup',
                         help='Folder name to save all the results to. Defaults to results/fixmatch/')
+    parser.add_argument('--epochs', type=int, default=20,
+                        help='Amount of epochs. Defaults to 20')
+    parser.add_argument('--lr', type=float, default=0.001,
+                        help='Learning rate. Defaults to 0.001')
+    parser.add_argument('--method', type=str, default='supervised',
+                        help='Which method to use, supervised, mixup or fixmatch. Defaults to supervised.')
+    parser.add_argument('--server', action='store_true',
+                        help='Use to run on server and sample from the designated folder.')
+    parser.add_argument('--batch_size', type=int, default=10,
+                        help='Batch size. Defaults to 10.')
 
     args = parser.parse_args()
+
+    results = []
+
+    if args.server:
+        data_path = '/data/ieee_supplement/Hyperspectral_Grids/{}'
+    else:
+        data_path = '/home/oscar/Desktop/Exjobb/Data/ieee_supplement/Hyperspectral_Grids/{}'
 
     for f in range(0,5):
         for r in range(args.runs):
             print('Running: ' + str(r) + 'time and: ' + str(f) + ' fold.')
-            mixup(['--data_dir', '/data/ieee_supplement/Hyperspectral_Grids/{}'.format(args.dataset), '--results', 'results/{}/'.format(args.run_name),'--epochs', '25', '--lr', '0.001', '--batch_size', '10', '--fold={}'.format(f), '--cuda', '0', '--flip_augmentation'])
-
-    #/data/ieee_supplement/Hyperspectral_Grids/{}
-    #/home/oscar/Desktop/Exjobb/Data/ieee_supplement/Hyperspectral_Grids/{}
+            if args.method == 'supervised':
+                result = supervised(['--data_dir', data_path.format(args.dataset), '--results', 'results/{}/'.format(args.run_name),'--epochs', '{}'.format(args.epochs), '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size), '--fold', '{}'.format(f), '--cuda', '0', '--flip_augmentation'])
+            elif args.method == 'mixup':
+                result = mixup(['--data_dir', data_path.format(args.dataset), '--results', 'results/{}/'.format(args.run_name),'--epochs', '{}'.format(args.epochs), '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size), '--fold', '{}'.format(f), '--cuda', '0', '--flip_augmentation'])
+            elif args.method == 'fixmatch':
+                result = fixmatch(['--data_dir', data_path.format(args.dataset), '--results', 'results/{}/'.format(args.run_name),'--epochs', '{}'.format(args.epochs), '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size), '--fold', '{}'.format(f), '--cuda', '0', '--flip_augmentation'])
+            else:
+                print('No method with this name')
+                results = None
+            results.append(result)
 
     print('Ran all the folds.')
 
