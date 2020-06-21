@@ -182,12 +182,12 @@ def plot_confusion_matrix(cm, class_names):
     cm (array, shape = [n, n]): a confusion matrix of integer classes
     class_names (array, shape = [n]): String names of the integer classes
   """
-  figure = plt.figure(figsize=(8, 8))
+  figure = plt.figure(figsize=(10, 10))
   plt.imshow(cm, interpolation='nearest', cmap=plt.cm.Blues)
   plt.title("Confusion matrix")
   plt.colorbar()
   tick_marks = np.arange(len(class_names))
-  plt.xticks(tick_marks, class_names, rotation=45)
+  plt.xticks(tick_marks, class_names, rotation=45, ha='right')
   plt.yticks(tick_marks, class_names)
 
   # Normalize the confusion matrix.
@@ -202,6 +202,8 @@ def plot_confusion_matrix(cm, class_names):
   plt.tight_layout()
   plt.ylabel('True label')
   plt.xlabel('Predicted label')
+  plt.xlim(-0.5, len(class_names)-0.5)
+  plt.ylim(len(class_names)-0.5, -0.5)
   return figure
 
 def build_dataset(mat, gt, ignored_labels=None):
