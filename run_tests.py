@@ -4,12 +4,13 @@ from fixmatch_hsi import main as fixmatch
 from supervised_hsi import main as supervised
 from mixup_hsi import main as mixup
 import numpy as np
+from tensorboardX import SummaryWriter
 
 
 def main(raw_args=None):
     parser = argparse.ArgumentParser(description='Main testing file for running several tests over several datasets')
     parser.add_argument('--dataset', type=str, default='Salinas',
-                        help='Name of dataset to run. Salinas, PaviaU or Indian, defaults to Salinas')
+                        help='Name of dataset to run. Salinas, Pavia or Indian, defaults to Salinas')
     parser.add_argument('--runs', type=int, default=1,
                         help='Amount of time to run on each dataset/fold. Defaults to 1.')
     parser.add_argument('--data_sampling', type=str, default='nalepa',
@@ -28,6 +29,8 @@ def main(raw_args=None):
                         help='Batch size. Defaults to 10.')
     parser.add_argument('--threshold', type=float, default=0.95,
                         help='Confidence threshold for fixmatch method. Defaults to 0.95.')
+    parser.add_argument('--sampling_fixed', type=str, default='True',
+                        help='Use to sample a fixed amount of samples per class for nalepa sampling.')
 
     args = parser.parse_args(raw_args)
 
@@ -43,17 +46,29 @@ def main(raw_args=None):
     else:
         folds = 5
 
+    if args.dataset == 'Salinas':
+        data_folder = 'Pavia'
+    elif args.dataset == 'Pavia':
+        data_folder = 'Pavia University'
+    elif args.dataset == 'Indian':
+        data_folder = 'Indian Pines'
+    else:
+        print('No dataset by right name')
+
     avg_acc = np.zeros(folds)
+    writer = SummaryWriter('results/{}/'.format(args.run_name))
+
+    writer.add_text('Arguments', str(args))
 
     for f in range(0,folds):
         for r in range(args.runs):
             print('Running: ' + str(r) + 'time and: ' + str(f) + ' fold.')
             if args.method == 'supervised':
-                result = supervised(['--data_dir', data_path.format(args.dataset), '--results', 'results/{}/'.format(args.run_name),'--epochs', '{}'.format(args.epochs), '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size), '--fold', '{}'.format(f), '--cuda', '0', '--flip_augmentation'])
+                result = supervised(['--class_balancing', '--dataset', args.dataset, '--data_dir', data_path.format(data_folder), '--results', 'results/{}/'.format(args.run_name),'--epochs', '{}'.format(args.epochs), '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size), '--fold', '{}'.format(f), '--cuda', '0', '--sampling_fixed', args.sampling_fixed])
             elif args.method == 'mixup':
-                result = mixup(['--data_dir', data_path.format(args.dataset), '--results', 'results/{}/'.format(args.run_name),'--epochs', '{}'.format(args.epochs), '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size), '--fold', '{}'.format(f), '--cuda', '0', '--flip_augmentation'])
+                result = mixup(['--class_balancing', '--dataset', args.dataset, '--data_dir', data_path.format(data_folder), '--results', 'results/{}/'.format(args.run_name),'--epochs', '{}'.format(args.epochs), '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size), '--fold', '{}'.format(f), '--cuda', '0', '--sampling_fixed', args.sampling_fixed])
             elif args.method == 'fixmatch':
-                result = fixmatch(['--class_balancing', '--data_dir', data_path.format(args.dataset), '--results', 'results/{}/'.format(args.run_name),'--epochs', '{}'.format(args.epochs), '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size), '--fold', '{}'.format(f), '--cuda', '0', '--sampling_fixed', '--threshold', '{}'.format(args.threshold)])
+                result = fixmatch(['--class_balancing', '--dataset', args.dataset, '--data_dir', data_path.format(data_folder), '--results', 'results/{}/'.format(args.run_name),'--epochs', '{}'.format(args.epochs), '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size), '--fold', '{}'.format(f), '--cuda', '0', '--sampling_fixed', args.sampling_fixed, '--threshold', '{}'.format(args.threshold)])
             else:
                 print('No method with this name')
                 results = None
@@ -72,7 +87,14 @@ def main(raw_args=None):
 
     print('Total average accuracy: ' + str(np.sum(avg_acc)/len(avg_acc)))
 
+    writer.add_text('Average accuracy per fold', str(avg_acc))
+    writer.add_text('Average accuracy for all folds', str(np.sum(avg_acc)/len(avg_acc)))
+
+    wrtier.close()
+
 if __name__ == '__main__':
-    thresholds = [0.7, 0.8, 0.9, 0.95]
-    for t in thresholds:
-        main(['--server', '--threshold', str(t), '--runs', str(3), '--epochs', str(40), '--method', 'fixmatch'])
+    methods = ['supervised', 'mixup', 'fixmatch']
+    fixed_sampling = ['False', 'True']
+    for f in fixed_sampling:
+        for m in methods:
+            main(['--sampling_fixed', f, '--method', m, '--runs', str(1), '--epochs', str(1), '--dataset', 'Pavia'])

@@ -72,7 +72,7 @@ def main(raw_args=None):
                         help='use to enable Visdom for visualization, remember to start the Visdom server')
     parser.add_argument('--fold', type=int, default=0,
                         help='Which fold to sample from if using Nalepas validation scheme')
-    parser.add_argument('--sampling_fixed', action='store_true',
+    parser.add_argument('--sampling_fixed', type=str, default='True',
                         help='Use to sample a fixed amount of samples for each class from Nalepa sampling')
     parser.add_argument('--samples_per_class', type=int, default=10,
                         help='Amount of samples to sample for each class when sampling a fixed amount. Defaults to 10.')
@@ -147,7 +147,7 @@ def main(raw_args=None):
         #Get fixed amount of random samples for validation
         idx_sup, idx_val, idx_unsup = get_pixel_idx(train_img, train_gt, args.ignored_labels, args.patch_size)
 
-        if args.sampling_mode == 'fixed_nalepa':
+        if args.sampling_fixed == 'True':
             unique_labels = np.zeros(len(label_values))
             new_idx_sup = []
             index = 0
@@ -168,6 +168,7 @@ def main(raw_args=None):
         for c in np.unique(train_labeled_gt):
             samples_class[c-1] = np.count_nonzero(train_labeled_gt == c)
         writer.add_text('Labeled samples per class', str(samples_class))
+        print('Labeled samples per class: ' + str(samples_class))
 
         val_dataset = HyperX_patches(train_img, train_gt, idx_val, labeled=True, **vars(args))
         val_loader = data.DataLoader(val_dataset, batch_size=args.batch_size)
