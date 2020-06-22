@@ -75,4 +75,4 @@ def main(raw_args=None):
 if __name__ == '__main__':
     thresholds = [0.7, 0.8, 0.9, 0.95]
     for t in thresholds:
-        main(['--threshold', str(t), '--runs', str(1), '--epochs', str(1), '--method', 'fixmatch'])
+        main(['--server', '--threshold', str(t), '--runs', str(3), '--epochs', str(40), '--method', 'fixmatch'])
