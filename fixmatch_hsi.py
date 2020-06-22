@@ -29,9 +29,9 @@ def main(raw_args=None):
                         help='Size of patch around each pixel taken for classification')
     parser.add_argument('--center_pixel', action='store_false',
                         help='use if you only want to consider the label of the center pixel of a patch')
-    parser.add_argument('--batch_size', type=int, default=64,
+    parser.add_argument('--batch_size', type=int, default=10,
                         help='Size of each batch for training')
-    parser.add_argument('--epochs', type=int, default=20,
+    parser.add_argument('--epochs', type=int, default=10,
                         help='number of total epochs of training to run')
     parser.add_argument('--dataset', type=str, default='Salinas',
                         help='Name of dataset to run, Salinas or PaviaU')
@@ -49,7 +49,7 @@ def main(raw_args=None):
                         help='percentage of dataset to sample for training (labeled and unlabeled included)')
     parser.add_argument('--sampling_mode', type=str, default='nalepa',
                         help='how to sample data, disjoint, random, or fixed')
-    parser.add_argument('--lr', type=float, default=0.03,
+    parser.add_argument('--lr', type=float, default=0.001,
                         help='initial learning rate')
     parser.add_argument('--unlabeled_ratio', type=int, default=7,
                         help='ratio of unlabeled data to labeled (spliting the training data into these ratios)')
@@ -73,6 +73,10 @@ def main(raw_args=None):
                         help='wihch file to load weights from (default None)')
     parser.add_argument('--fold', type=int, default=0,
                         help='Which fold to sample from if using Nalepas validation scheme')
+    parser.add_argument('--sampling_fixed', action='store_true',
+                        help='Use to sample a fixed amount of samples for each class from Nalepa sampling')
+    parser.add_argument('--samples_per_class', type=int, default=10,
+                        help='Amount of samples to sample for each class when sampling a fixed amount. Defaults to 10.')
 
 
     parser.add_argument('--supervision', type=str, default='full',
@@ -141,6 +145,20 @@ def main(raw_args=None):
     if args.sampling_mode == 'nalepa':
         #Get fixed amount of random samples for validation
         idx_sup, idx_val, idx_unsup = get_pixel_idx(train_img, train_gt, args.ignored_labels, args.patch_size)
+
+        if args.sampling_fixed:
+            unique_labels = np.zeros(len(label_values))
+            new_idx_sup = []
+            index = 0
+            for p,x,y in idx_sup:
+                label = train_gt[p,x,y]
+                if unique_labels[label] < args.samples_per_class:
+                    unique_labels[label] += 1
+                    new_idx_sup.append([p,x,y])
+                    np.delete(idx_sup, index)
+                index += 1
+            idx_unsup = np.concatenate((idx_sup, idx_unsup))
+            idx_sup = np.asarray(new_idx_sup)
 
         writer.add_text('Amount of labeled training samples', "{} samples selected (over {})".format(idx_sup.shape[0], np.count_nonzero(train_gt)))
         train_labeled_gt = [train_gt[p_l, x_l, y_l] for p_l, x_l, y_l in idx_sup]

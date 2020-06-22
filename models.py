@@ -89,7 +89,7 @@ class HamidaEtAl(nn.Module):
         x = self.dropout(x)
         x = self.fc(x)
         return x
-"""
+
 class NalepaEtAl(nn.Module):
     @staticmethod
     def weight_init(m):
@@ -100,11 +100,29 @@ class NalepaEtAl(nn.Module):
         super(NalepaEtAl, self).__init__()
 
         self.input_channels = input_channels
+
         self.conv = nn.Conv1d(1, 200, 5)
         self.bn = nn.BatchNorm1d(200)
         self.pool = nn.MaxPool(2)
-        self.fc1 = nn.Linear( ,512)
+
+        self.feature_size = self._get_final_flattened_size()
+
+        self.fc1 = nn.Linear(self.feature_size ,512)
         self.fc2 = nn.Linear(512, 128)
         self.fc3 = nn.Linear(128,n_classes)
 
-"""
+    def _get_final_flattened_size(self):
+        with torch.no_grad():
+            x = torch.zeros((1, 1, self.input_channels))
+            x = self.pool1(self.conv(x))
+            _, t, c, w, h = x.size()
+        return t * c * w * h
+
+    def forward(self, x):
+        x = F.relu(self.conv(x))
+        x = self.pool(x)
+        x = x.view(-1, self.features_size)
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        x = self.fc3(x)
+        return x

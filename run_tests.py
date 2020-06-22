@@ -51,7 +51,7 @@ def main():
             elif args.method == 'mixup':
                 result = mixup(['--data_dir', data_path.format(args.dataset), '--results', 'results/{}/'.format(args.run_name),'--epochs', '{}'.format(args.epochs), '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size), '--fold', '{}'.format(f), '--cuda', '0', '--flip_augmentation'])
             elif args.method == 'fixmatch':
-                result = fixmatch(['--data_dir', data_path.format(args.dataset), '--results', 'results/{}/'.format(args.run_name),'--epochs', '{}'.format(args.epochs), '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size), '--fold', '{}'.format(f), '--cuda', '0', '--flip_augmentation'])
+                result = fixmatch(['--data_dir', data_path.format(args.dataset), '--results', 'results/{}/'.format(args.run_name),'--epochs', '{}'.format(args.epochs), '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size), '--fold', '{}'.format(f), '--cuda', '0', '--sampling_fixed'])
             else:
                 print('No method with this name')
                 results = None
