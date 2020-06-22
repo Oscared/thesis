@@ -176,7 +176,7 @@ def main(raw_args=None):
                                        pin_memory=True, num_workers=5,
                                        shuffle=True, drop_last=True)
 
-        unlabeled_ratio = math.ceil(len(idx_unsup)/len(idx_sup))
+        unlabeled_ratio = 7 #math.ceil(len(idx_unsup)/len(idx_sup))
 
         train_unlabeled_dataset = HyperX_patches(train_img, train_gt, idx_unsup, labeled=False, **vars(args))
         train_unlabeled_loader = data.DataLoader(train_unlabeled_dataset, batch_size=args.batch_size*unlabeled_ratio,
