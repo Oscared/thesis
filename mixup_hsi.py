@@ -137,7 +137,7 @@ def main(raw_args=None):
                        patch_size=args.patch_size)
 
     optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=0.9,
-                          nesterov=True)
+                          nesterov=True, weight_decay=0.0005)
     #loss_labeled = nn.CrossEntropyLoss(weight=weights)
     #loss_unlabeled = nn.CrossEntropyLoss(weight=weights, reduction='none')
 

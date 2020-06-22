@@ -138,7 +138,7 @@ def main(raw_args=None):
                        patch_size=args.patch_size)
 
     optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=0.9,
-                          nesterov=True)
+                          nesterov=True, weight_decay=0.0005)
     #loss_labeled = nn.CrossEntropyLoss(weight=weights)
     #loss_unlabeled = nn.CrossEntropyLoss(weight=weights, reduction='none')
 
@@ -176,7 +176,7 @@ def main(raw_args=None):
                                        pin_memory=True, num_workers=5,
                                        shuffle=True, drop_last=True)
 
-        unlabeled_ratio = 7 #math.ceil(len(idx_unsup)/len(idx_sup))
+        unlabeled_ratio = math.ceil(len(idx_unsup)/len(idx_sup))
 
         train_unlabeled_dataset = HyperX_patches(train_img, train_gt, idx_unsup, labeled=False, **vars(args))
         train_unlabeled_loader = data.DataLoader(train_unlabeled_dataset, batch_size=args.batch_size*unlabeled_ratio,
@@ -305,7 +305,7 @@ def train(net, optimizer, criterion_labeled, criterion_unlabeled, criterion_val,
         unlabeled_data_loader: a PyTorch dataset loader for the weakly and
                                strongly augmented, unlabeled dataset
         epoch: int specifying the number of training epochs
-        threshold: probability thresold for pseudo labels acceptance
+        threshold: probability threshold for pseudo labels acceptance
         criterion_labeled: a PyTorch-compatible loss function, e.g. nn.CrossEntropyLoss
                             for the labeled Training
         criterion_unlabeled: a PyTorch-compatible loss function, e.g. nn.CrossEntropyLoss

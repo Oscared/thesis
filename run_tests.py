@@ -6,7 +6,7 @@ from mixup_hsi import main as mixup
 import numpy as np
 
 
-def main():
+def main(raw_args=None):
     parser = argparse.ArgumentParser(description='Main testing file for running several tests over several datasets')
     parser.add_argument('--dataset', type=str, default='Salinas',
                         help='Name of dataset to run. Salinas, PaviaU or Indian, defaults to Salinas')
@@ -26,8 +26,10 @@ def main():
                         help='Use to run on server and sample from the designated folder.')
     parser.add_argument('--batch_size', type=int, default=10,
                         help='Batch size. Defaults to 10.')
+    parser.add_argument('--threshold', type=float, default=0.95,
+                        help='Confidence threshold for fixmatch method. Defaults to 0.95.')
 
-    args = parser.parse_args()
+    args = parser.parse_args(raw_args)
 
     results = []
 
@@ -51,7 +53,7 @@ def main():
             elif args.method == 'mixup':
                 result = mixup(['--data_dir', data_path.format(args.dataset), '--results', 'results/{}/'.format(args.run_name),'--epochs', '{}'.format(args.epochs), '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size), '--fold', '{}'.format(f), '--cuda', '0', '--flip_augmentation'])
             elif args.method == 'fixmatch':
-                result = fixmatch(['--data_dir', data_path.format(args.dataset), '--results', 'results/{}/'.format(args.run_name),'--epochs', '{}'.format(args.epochs), '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size), '--fold', '{}'.format(f), '--cuda', '0', '--sampling_fixed'])
+                result = fixmatch(['--class_balancing', '--data_dir', data_path.format(args.dataset), '--results', 'results/{}/'.format(args.run_name),'--epochs', '{}'.format(args.epochs), '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size), '--fold', '{}'.format(f), '--cuda', '0', '--sampling_fixed', '--threshold', '{}'.format(args.threshold)])
             else:
                 print('No method with this name')
                 results = None
@@ -71,4 +73,6 @@ def main():
     print('Total average accuracy: ' + str(np.sum(avg_acc)/len(avg_acc)))
 
 if __name__ == '__main__':
-    main()
+    thresholds = [0.7, 0.8, 0.9, 0.95]
+    for t in thresholds:
+        main(['--threshold', str(t), '--runs', str(1), '--epochs', str(1), '--method', 'fixmatch'])
