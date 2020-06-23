@@ -90,11 +90,11 @@ def main(raw_args=None):
     writer.add_text('Average accuracy per fold', str(avg_acc))
     writer.add_text('Average accuracy for all folds', str(np.sum(avg_acc)/len(avg_acc)))
 
-    wrtier.close()
+    writer.close()
 
 if __name__ == '__main__':
     methods = ['supervised', 'mixup', 'fixmatch']
     fixed_sampling = ['False', 'True']
     for f in fixed_sampling:
         for m in methods:
-            main(['--sampling_fixed', f, '--method', m, '--runs', str(1), '--epochs', str(1), '--dataset', 'Pavia'])
+            main(['--server', '--sampling_fixed', f, '--method', m, '--runs', str(5), '--epochs', str(30), '--dataset', 'Pavia'])
