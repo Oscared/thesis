@@ -51,7 +51,7 @@ def main(raw_args=None):
         folds = 5
 
     if args.dataset == 'Salinas':
-        data_folder = 'Pavia'
+        data_folder = 'Salinas'
     elif args.dataset == 'Pavia':
         data_folder = 'Pavia University'
     elif args.dataset == 'Indian':

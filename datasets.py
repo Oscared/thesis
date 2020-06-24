@@ -511,6 +511,7 @@ class HyperX_patches(torch.utils.data.Dataset):
         self.radiation_augmentation = args['radiation_augmentation']
         self.mixture_augmentation = args['mixture_augmentation']
         self.pca_augmentation = args['pca_augmentation']
+        self.pca_strength = args['pca_strength']
         self.center_pixel = args['center_pixel']
         self.labeled = labeled
 
@@ -671,12 +672,6 @@ class HyperX_patches(torch.utils.data.Dataset):
 
     def identity(data):
         return data
-"""
-    def posterize(data, M=1):
-
-
-    def randaug(data, k=1, M=1):
-"""
 
     def __len__(self):
         return len(self.idx)
