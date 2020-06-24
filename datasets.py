@@ -216,7 +216,7 @@ def get_patch_data(dataset_name, patch_size, target_folder=dataset_path, fold=0)
 class HyperX(torch.utils.data.Dataset):
     """ Generic class for a hyperspectral scene """
 
-    def __init__(self, data, gt, labeled=True, pca_aug=False, **args):
+    def __init__(self, data, gt, labeled=True, **args):
         """
         Args:
             data: 3D hyperspectral image
@@ -238,7 +238,7 @@ class HyperX(torch.utils.data.Dataset):
         self.mixture_augmentation = args['mixture_augmentation']
         self.center_pixel = args['center_pixel']
         self.labeled = labeled
-        self.pca_aug = pca_aug
+        self.pca_augmentation = args['pca_augmentation']
         supervision = args['supervision']
         # Fully supervised : use all pixels with label not ignored
         if supervision == 'full':
@@ -388,7 +388,7 @@ class HyperX(torch.utils.data.Dataset):
                 data = self.radiation_noise(data)
             if self.mixture_augmentation and np.random.random() < 0.2:
                 data = self.mixture_noise(data, label)
-            if self.pca_aug and np.random.random() < 0.2:
+            if self.pca_augmentation and np.random.random() < 0.2:
                 data = self.pca_augmentation(data)
 
             # Copy the data into numpy arrays (PyTorch doesn't like numpy views)
@@ -488,7 +488,7 @@ def get_pixel_idx(data, gt, ignored_labels, patch_size):
 class HyperX_patches(torch.utils.data.Dataset):
     """ Generic class for a hyperspectral scene with list of 3D HSI """
 
-    def __init__(self, data, gt, idx, labeled=True, pca_aug=False, **args):
+    def __init__(self, data, gt, idx, labeled=True, **args):
         """
         Args:
             data: list of 3D hyperspectral image patches
@@ -510,9 +510,10 @@ class HyperX_patches(torch.utils.data.Dataset):
         self.flip_augmentation = args['flip_augmentation']
         self.radiation_augmentation = args['radiation_augmentation']
         self.mixture_augmentation = args['mixture_augmentation']
+        self.pca_augmentation = args['pca_augmentation']
         self.center_pixel = args['center_pixel']
         self.labeled = labeled
-        self.pca_aug = pca_aug
+
 
 
         """
@@ -585,13 +586,12 @@ class HyperX_patches(torch.utils.data.Dataset):
         return (alpha1 * data + alpha2 * data2) / (alpha1 + alpha2) + beta * noise
 
     #PCA augmentation technique. Adds noise in pca space and transform back
-    def pca_augmentation(self, data, label, strength=1):
+    def pca_augmentation(self, data, label, M=1):
         data_aug = np.zeros_like(data)
         data_train = data - np.mean(self.data, axis=(0,1,2))
         for idx, _ in np.ndenumerate(data[:,:,0]):
-            #if value not in self.ignored_labels:
             x,y = idx
-            alpha = strength*np.random.uniform(0.9,1.1)
+            alpha = M*np.random.uniform(0.9,1.1)
             data_pca = self.pca.transform(data_train[x,y,:].reshape(1,-1))
             data_pca[:,0] = data_pca[:,0]*alpha
             data_aug[x,y,:] = self.pca.inverse_transform(data_pca)
@@ -606,45 +606,77 @@ class HyperX_patches(torch.utils.data.Dataset):
     #[0 0 0 0 0]
     #[0 0 0 0 0]
     #fucked up augmentation purely made for 5x5 patches...
-    def cutout_hsi(image):
+    def cutout_spatial(image):
         cutout_image = image
         y = np.random.choice([-1,0,1])
         if y == 0:
             x = np.random.choice([-1,1])
             x_step = 2*x
-            x1 = np.min(x, x_step)
-            x2 = np.max(x, x_step)
+            x1 = np.min(x, x_step) + 2
+            x2 = np.max(x, x_step) + 2
 
             y_step = np.random.choice([-1,1])
-            y1 = np.min(y, y_step)
-            y2 = np.max(y, y_step)
+            y1 = np.min(y, y_step) + 2
+            y2 = np.max(y, y_step) + 2
         else:
             x = np.random.choice([-1,0,1])
             if x == 0:
                 x_step = np.random.choice([-1,1])
-                x1 = np.min(x, x_step)
-                x2 = np.max(x, x_step)
+                x1 = np.min(x, x_step) + 2
+                x2 = np.max(x, x_step) + 2
             else:
-                x_step = 2*x
-                x1 = np.min(x, x_step)
-                x2 = np.max(x, x_step)
+                x_step = np.random.choice([-1,1])
+                x1 = np.min(x, x_step) + 2
+                x2 = np.max(x, x_step) + 2
             y_step = 2*y
-            y1 = np.min(y, y_step)
-            y2 = np.max(y, y_step)
+            y1 = np.min(y, y_step) + 2
+            y2 = np.max(y, y_step) + 2
         cutout_image[y1:y2,x1:x2,:] = 0
         return cutout_image
-    def cutout(image, size=2, n_squares=1):
+    #Hyperspectral cutout method to cutout part of the spectral bands
+    def cutout_spectral(image, M=1):
         h, w, channels = image.shape
+        #See if magnitude works as factor
+        cutouts = 5*M
+        bands = 5*M
         new_image = image
-        for _ in range(n_squares):
-            y = np.random.randint(h)
-            x = np.random.randint(w)
-            y1 = np.clip(y - size // 2, 0, h)
-            y2 = np.clip(y + size // 2, 0, h)
-            x1 = np.clip(x - size // 2, 0, w)
-            x2 = np.clip(x + size // 2, 0, w)
-            new_image[y1:y2,x1:x2,:] = 0
+        for _ in range(cutouts):
+            c = np.random.randint(c)
+            c1 = np.clip(c - bands // 2, 0, channels)
+            c2 = np.clip(c1 + bands, 0, channels)
+            new_image[:,:,c1:c2] = 0
         return new_image
+
+    def spatial_combinations(data, M=1):
+        h, w, c = data.shape
+        #Test to see if it is possible to use a magnitude as scaling fator for amount of samples to mix from
+        size = 2*M
+        new_image = np.zeros_like(data)
+        for x in range(h):
+            for y in range(w):
+                x1 = np.clip(x - size // 2, 0, h)
+                x2 = np.clip(x + size // 2 + 1, 0, h)
+                y1 = np.clip(y - size // 2, 0, w)
+                y2 = np.clip(y + size // 2 + 1,  0, w)
+                patch = data[x1:x2, y1:y2, :]
+                patch = patch.reshape(np.prod(patch.shape[:2]), c)
+                delete_idx = []
+                for p in range(patch.shape[0]):
+                    if np.sum(patch[p,:])==0:
+                        delete_idx.append(p)
+                patch = np.delete(patch, delete_idx, 0)
+            alphas = np.random.uniform(0.01, 1, size=patch.shape[0])
+            new_image[x,y,:] = np.dot(np.transpose(patch), alphas)/np.sum(alphas)
+        return new_image
+
+    def identity(data):
+        return data
+"""
+    def posterize(data, M=1):
+
+
+    def randaug(data, k=1, M=1):
+"""
 
     def __len__(self):
         return len(self.idx)
@@ -666,12 +698,12 @@ class HyperX_patches(torch.utils.data.Dataset):
             if self.flip_augmentation and self.patch_size > 1:
                 # Perform data augmentation (only on 2D patches)
                 data, label = self.flip(data, label)
-            if self.radiation_augmentation and np.random.random() < 0.1:
+            if self.radiation_augmentation and np.random.random() < 0.5:
                 data = self.radiation_noise(data)
-            if self.mixture_augmentation and np.random.random() < 0.2:
+            if self.mixture_augmentation and np.random.random() < 0.5:
                 data = self.mixture_noise(data, label)
-            if self.pca_aug and np.random.random() < 0.2:
-                data = self.pca_augmentation(data)
+            if self.pca_augmentation and np.random.random() < 0.5:
+                data = self.pca_augmentation(data, label, strength=self.pca_strength)
 
             # Copy the data into numpy arrays (PyTorch doesn't like numpy views)
             data = np.asarray(np.copy(data).transpose((2, 0, 1)), dtype='float32')
@@ -706,6 +738,8 @@ class HyperX_patches(torch.utils.data.Dataset):
 
             data_weak = self.data[p, x1:x2, y1:y2]
             data_strong = np.copy(data_weak)
+            #This will currently not work with data that has no labels, it doesnt harm it right now either though...
+            # i.e. it is a zero matrix
             label_weak = self.label[p, x1:x2, y1:y2]
             label_strong = np.copy(label_weak)
 
@@ -718,7 +752,7 @@ class HyperX_patches(torch.utils.data.Dataset):
             #if np.random.rand() < 0.7:
                 #data_strong = self.mixture_noise(data_strong, label_strong)
             if np.random.rand() < 0.7:
-                data_strong = self.pca_augmentation(data_strong, label_strong, strength=1.1)
+                data_strong = self.pca_augmentation(data_strong, label_strong, strength=self.pca_strength)
 
             # Copy the data into numpy arrays (PyTorch doesn't like numpy views)
             data_weak = np.asarray(np.copy(data_weak).transpose((2, 0, 1)), dtype='float32')

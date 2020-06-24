@@ -56,12 +56,24 @@ def main(raw_args=None):
                         help='use to balance weights according to ratio in dataset')
     parser.add_argument('--checkpoint', type=str, default=None,
                         help='use to load model weights from a certain directory')
+    #Augmentation arguments
     parser.add_argument('--flip_augmentation', action='store_true',
                         help='use to flip augmentation data for use')
     parser.add_argument('--radiation_augmentation', action='store_true',
                         help='use to radiation noise data for use')
     parser.add_argument('--mixture_augmentation', action='store_true',
                         help='use to mixture noise data for use')
+    parser.add_argument('--pca_augmentation', action='store_true',
+                        help='use to pca augment data for use')
+    parser.add_argument('--pca_strength', type=float, default=1,
+                        help='Strength of the PCA augmentation, defaults to 1.')
+    parser.add_argument('--cutout_spatial', action='store_true',
+                        help='use to cutout spatial for data augmentation')
+    parser.add_argument('--cutout_spectral', action='store_true',
+                        help='use to cutout spectral for data augmentation')
+    parser.add_argument('--augmentation_magnitude', type=int, default=1,
+                        help='Magnitude of augmentation (so far only for cutout). Defualts to 1, min 1 and max 10.')
+
     parser.add_argument('--results', type=str, default='results',
                         help='where to save results to (default results)')
     parser.add_argument('--save_dir', type=str, default='/saves/',
