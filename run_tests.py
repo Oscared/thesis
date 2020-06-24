@@ -106,4 +106,4 @@ if __name__ == '__main__':
     """
     strength = [1.0, 2.0, 4.0, 7.0, 10.0]
     for s in strength:
-        main(['--runs', str(3), '--pca_strength', str(s)])
+        main(['--server', '--runs', str(3), '--pca_strength', str(s)])
