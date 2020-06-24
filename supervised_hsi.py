@@ -63,7 +63,7 @@ def main(raw_args=None):
                         help='use to mixture noise data for use')
     parser.add_argument('--pca_augmentation', action='store_true',
                         help='use to pca augment data for use')
-    parser.add_argument('--pca_strength', type=float, default=1,
+    parser.add_argument('--pca_strength', type=float, default=1.0,
                         help='Strength of the PCA augmentation, defaults to 1.')
     parser.add_argument('--cutout_spatial', action='store_true',
                         help='use to cutout spatial for data augmentation')

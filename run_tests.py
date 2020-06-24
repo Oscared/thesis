@@ -51,7 +51,7 @@ def main(raw_args=None):
         folds = 5
 
     if args.dataset == 'Salinas':
-        data_folder = 'Pavia'
+        data_folder = 'Salinas'
     elif args.dataset == 'Pavia':
         data_folder = 'Pavia University'
     elif args.dataset == 'Indian':
@@ -104,6 +104,6 @@ if __name__ == '__main__':
         for m in methods:
             main(['--server', '--sampling_fixed', f, '--method', m, '--runs', str(5), '--epochs', str(30), '--dataset', 'Pavia'])
     """
-    strength = [1, 2, 4, 7, 10]
+    strength = [1.0, 2.0, 4.0, 7.0, 10.0]
     for s in strength:
-        main(['--server', '--runs', str(3), '--pca_strength', str(s)])
+        main(['--runs', str(3), '--pca_strength', str(s)])

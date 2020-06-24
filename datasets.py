@@ -238,7 +238,7 @@ class HyperX(torch.utils.data.Dataset):
         self.mixture_augmentation = args['mixture_augmentation']
         self.center_pixel = args['center_pixel']
         self.labeled = labeled
-        self.pca_augmentation = args['pca_augmentation']
+        self.pca_aug = args['pca_augmentation']
         supervision = args['supervision']
         # Fully supervised : use all pixels with label not ignored
         if supervision == 'full':
@@ -304,13 +304,13 @@ class HyperX(torch.utils.data.Dataset):
         return (alpha1 * data + alpha2 * data2) / (alpha1 + alpha2) + beta * noise
 
     #PCA augmentation technique. Adds noise in pca space and transform back
-    def pca_augmentation(self, data, label, strength=1):
+    def pca_augmentation(self, data, label, M=1):
         data_aug = np.zeros_like(data)
         data_train = data - np.mean(self.data)
         for idx, value in np.ndenumerate(label):
             if value not in self.ignored_labels:
                 x,y = idx
-                alpha = strength*np.random.uniform(0.9,1.1)
+                alpha = M*np.random.uniform(0.9,1.1)
                 data_pca = self.pca.transform(data_train[x,y,:].reshape(1,-1))
                 data_pca[:,0] = data_pca[:,0]*alpha
                 data_aug[x,y,:] = self.pca.inverse_transform(data_pca)
@@ -388,7 +388,7 @@ class HyperX(torch.utils.data.Dataset):
                 data = self.radiation_noise(data)
             if self.mixture_augmentation and np.random.random() < 0.2:
                 data = self.mixture_noise(data, label)
-            if self.pca_augmentation and np.random.random() < 0.2:
+            if self.pca_aug and np.random.random() < 0.2:
                 data = self.pca_augmentation(data)
 
             # Copy the data into numpy arrays (PyTorch doesn't like numpy views)
@@ -432,7 +432,7 @@ class HyperX(torch.utils.data.Dataset):
             if np.random.rand() < 0.7:
                 data_strong = self.mixture_noise(data_strong, label_strong)
             if np.random.rand() < 0.7:
-                data_strong = self.pca_augmentation(data_strong, label_strong, strength=1.1)
+                data_strong = self.pca_augmentation(data_strong, label_strong, M=1.1)
 
             # Copy the data into numpy arrays (PyTorch doesn't like numpy views)
             data_weak = np.asarray(np.copy(data_weak).transpose((2, 0, 1)), dtype='float32')
@@ -510,7 +510,8 @@ class HyperX_patches(torch.utils.data.Dataset):
         self.flip_augmentation = args['flip_augmentation']
         self.radiation_augmentation = args['radiation_augmentation']
         self.mixture_augmentation = args['mixture_augmentation']
-        self.pca_augmentation = args['pca_augmentation']
+        self.pca_aug = args['pca_augmentation']
+        self.pca_strength = args['pca_strength']
         self.center_pixel = args['center_pixel']
         self.labeled = labeled
 
@@ -671,12 +672,6 @@ class HyperX_patches(torch.utils.data.Dataset):
 
     def identity(data):
         return data
-"""
-    def posterize(data, M=1):
-
-
-    def randaug(data, k=1, M=1):
-"""
 
     def __len__(self):
         return len(self.idx)
@@ -702,8 +697,8 @@ class HyperX_patches(torch.utils.data.Dataset):
                 data = self.radiation_noise(data)
             if self.mixture_augmentation and np.random.random() < 0.5:
                 data = self.mixture_noise(data, label)
-            if self.pca_augmentation and np.random.random() < 0.5:
-                data = self.pca_augmentation(data, label, strength=self.pca_strength)
+            if self.pca_aug and np.random.random() < 0.5:
+                data = self.pca_augmentation(data, label, M=self.pca_strength)
 
             # Copy the data into numpy arrays (PyTorch doesn't like numpy views)
             data = np.asarray(np.copy(data).transpose((2, 0, 1)), dtype='float32')
@@ -752,7 +747,7 @@ class HyperX_patches(torch.utils.data.Dataset):
             #if np.random.rand() < 0.7:
                 #data_strong = self.mixture_noise(data_strong, label_strong)
             if np.random.rand() < 0.7:
-                data_strong = self.pca_augmentation(data_strong, label_strong, strength=self.pca_strength)
+                data_strong = self.pca_augmentation(data_strong, label_strong, M=self.pca_strength)
 
             # Copy the data into numpy arrays (PyTorch doesn't like numpy views)
             data_weak = np.asarray(np.copy(data_weak).transpose((2, 0, 1)), dtype='float32')
