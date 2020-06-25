@@ -104,6 +104,6 @@ if __name__ == '__main__':
         for m in methods:
             main(['--server', '--sampling_fixed', f, '--method', m, '--runs', str(5), '--epochs', str(30), '--dataset', 'Pavia'])
     """
-    strength = [1.0, 2.0, 4.0, 7.0, 10.0]
+    strength = [15, 20, 25, 30]
     for s in strength:
         main(['--server', '--runs', str(3), '--pca_strength', str(s)])
