@@ -35,6 +35,8 @@ def main(raw_args=None):
 
     parser.add_argument('--pca_strength', type=float, default=1,
                         help='Strength of PCA augmentation')
+    parser.add_argument('--cutout', type=str, default='none',
+                        help='Use cutout or no.')
 
     args = parser.parse_args(raw_args)
 
@@ -68,7 +70,13 @@ def main(raw_args=None):
         for r in range(args.runs):
             print('Running: ' + str(r) + 'time and: ' + str(f) + ' fold.')
             if args.method == 'supervised':
-                result = supervised(['--pca_strength', str(args.pca_strength), '--pca_augmentation', '--class_balancing', '--dataset', args.dataset, '--data_dir', data_path.format(data_folder), '--results', 'results/{}/'.format(args.run_name),'--epochs', '{}'.format(args.epochs), '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size), '--fold', '{}'.format(f), '--cuda', '0', '--sampling_fixed', args.sampling_fixed])
+                if args.cutout == 'none':
+                    supervised_args = ['--class_balancing', '--dataset', args.dataset, '--data_dir', data_path.format(data_folder), '--results', 'results/{}/'.format(args.run_name),'--epochs', '{}'.format(args.epochs), '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size), '--fold', '{}'.format(f), '--cuda', '0', '--sampling_fixed', args.sampling_fixed]
+                elif args.cutout == 'spatial':
+                    supervised_args = ['--cutout_spatial', '--class_balancing', '--dataset', args.dataset, '--data_dir', data_path.format(data_folder), '--results', 'results/{}/'.format(args.run_name),'--epochs', '{}'.format(args.epochs), '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size), '--fold', '{}'.format(f), '--cuda', '0', '--sampling_fixed', args.sampling_fixed]
+                elif args.cutout == 'spectral':
+                    supervised_args = ['--cutout_spectral', '--class_balancing', '--dataset', args.dataset, '--data_dir', data_path.format(data_folder), '--results', 'results/{}/'.format(args.run_name),'--epochs', '{}'.format(args.epochs), '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size), '--fold', '{}'.format(f), '--cuda', '0', '--sampling_fixed', args.sampling_fixed]
+                result = supervised(supervised_args)
             elif args.method == 'mixup':
                 result = mixup(['--class_balancing', '--dataset', args.dataset, '--data_dir', data_path.format(data_folder), '--results', 'results/{}/'.format(args.run_name),'--epochs', '{}'.format(args.epochs), '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size), '--fold', '{}'.format(f), '--cuda', '0', '--sampling_fixed', args.sampling_fixed])
             elif args.method == 'fixmatch':
@@ -104,6 +112,6 @@ if __name__ == '__main__':
         for m in methods:
             main(['--server', '--sampling_fixed', f, '--method', m, '--runs', str(5), '--epochs', str(30), '--dataset', 'Pavia'])
     """
-    strength = [0.1, 0.25, 3, 5]
-    for s in strength:
-        main(['--server', '--runs', str(3), '--pca_strength', str(s), '--epochs', '10'])
+    cutout = ['none', 'spatial', 'spectral']
+    for c in cutout:
+        main(['--server', '--runs', str(3), '--cutout', c, '--epochs', '10'])

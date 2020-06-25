@@ -507,11 +507,15 @@ class HyperX_patches(torch.utils.data.Dataset):
         self.patch_size = args['patch_size']
         self.name = args['dataset']
         self.ignored_labels = set(args['ignored_labels'])
+        #Augmentations
         self.flip_augmentation = args['flip_augmentation']
         self.radiation_augmentation = args['radiation_augmentation']
         self.mixture_augmentation = args['mixture_augmentation']
         self.pca_aug = args['pca_augmentation']
         self.pca_strength = args['pca_strength']
+        self.spatial_cutout_aug = args['cutout_spatial']
+        self.spectral_cutout_aug = args['cutout_spectral']
+
         self.center_pixel = args['center_pixel']
         self.labeled = labeled
 
@@ -701,6 +705,10 @@ class HyperX_patches(torch.utils.data.Dataset):
                 data = self.mixture_noise(data, label)
             if self.pca_aug and np.random.random() < 0.5:
                 data = self.pca_augmentation(data, label, M=self.pca_strength)
+            if self.spatial_cutout_aug and np.random.random() < 0.5:
+                data = self.cutout_spatial(data)
+            if self.spectral_cutout_aug and np.random.random() < 0.5:
+                data = self.cutout_spectral(data)
 
             # Copy the data into numpy arrays (PyTorch doesn't like numpy views)
             data = np.asarray(np.copy(data).transpose((2, 0, 1)), dtype='float32')
