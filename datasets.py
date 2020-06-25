@@ -548,7 +548,9 @@ class HyperX_patches(torch.utils.data.Dataset):
                 self.class_var[c] = np.diag(var)
         """
 
-        centered_data = self.data - np.mean(self.data, axis=(0,1,2))
+        self.data_mean = np.mean(self.data, axis=(0,1,2))
+
+        centered_data = self.data - self.data_mean
         data_train = np.array([self.data[p_l, x_l, y_l] for p_l, x_l, y_l in self.idx])
         self.pca = PCA(n_components=11)
         self.pca.fit(data_train)
@@ -589,7 +591,7 @@ class HyperX_patches(torch.utils.data.Dataset):
     #PCA augmentation technique. Adds noise in pca space and transform back
     def pca_augmentation(self, data, label, M=1):
         data_aug = np.zeros_like(data)
-        data_train = data - np.mean(self.data, axis=(0,1,2))
+        data_train = data - self.data_mean
         for idx, _ in np.ndenumerate(data[:,:,0]):
             x,y = idx
             alpha = M*np.random.uniform(0.9,1.1)
