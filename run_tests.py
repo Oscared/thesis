@@ -114,4 +114,4 @@ if __name__ == '__main__':
     """
     cutout = ['spatial', 'spectral']
     for c in cutout:
-        main(['--runs', str(3), '--cutout', c, '--epochs', '10'])
+        main(['--server', '--runs', str(3), '--cutout', c, '--epochs', '10'])
