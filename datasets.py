@@ -614,6 +614,7 @@ class HyperX_patches(torch.utils.data.Dataset):
     #[0 0 0 0 0]
     #[0 0 0 0 0]
     #fucked up augmentation purely made for 5x5 patches...
+    """
     def cutout_spatial(self, image):
         cutout_image = image
         y = np.random.choice([-1,0,1])
@@ -641,12 +642,22 @@ class HyperX_patches(torch.utils.data.Dataset):
             y2 = np.max([y, y_step]) + 2
         cutout_image[y1:y2,x1:x2,:] = 0
         return cutout_image
+    """
+    def cutout_spatial(self, data):
+        cutout_image = np.copy(data)
+        x,y = data.shape[:2]
+        x_c, y_c = np.random.randint(x, size=2)
+        if x_c == x//2 and y_c == y//2:
+            return cutout_image
+        else:
+            cutout_image[x_c, y_c, :] = 0
+            return cutout_image
     #Hyperspectral cutout method to cutout part of the spectral bands
     def cutout_spectral(self, image, M=1):
         h, w, channels = image.shape
         #See if magnitude works as factor
         cutouts = 1*M
-        bands = 5*M
+        bands = 2*M
         new_image = image
         for _ in range(cutouts):
             c = np.random.randint(channels)

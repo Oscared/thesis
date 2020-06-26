@@ -62,7 +62,7 @@ def main(raw_args=None):
         print('No dataset by right name')
 
     avg_acc = np.zeros(folds)
-    writer = SummaryWriter('results/{}/'.format(args.run_name))
+    writer = SummaryWriter('results/{}/{}/'.format(args.run_name, args.cutout))
 
     writer.add_text('Arguments', str(args))
 
@@ -114,4 +114,4 @@ if __name__ == '__main__':
     """
     cutout = ['spatial', 'spectral']
     for c in cutout:
-        main(['--server', '--runs', str(3), '--cutout', c, '--epochs', '10'])
+        main(['--runs', str(3), '--cutout', c, '--epochs', '10'])
