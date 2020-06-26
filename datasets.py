@@ -516,6 +516,9 @@ class HyperX_patches(torch.utils.data.Dataset):
         self.spatial_cutout_aug = args['cutout_spatial']
         self.spectral_cutout_aug = args['cutout_spectral']
         self.M = args['augmentation_magnitude']
+        self.spatial_comb = args['spatial_combinations']
+        self.mean_spectral = args['spectral_mean']
+        self.spectral_mvavg = args['moving_average']
 
         self.center_pixel = args['center_pixel']
         self.labeled = labeled
@@ -666,7 +669,7 @@ class HyperX_patches(torch.utils.data.Dataset):
             new_image[:,:,c1:c2] = 0
         return new_image
 
-    def spatial_combinations(data, M=1):
+    def spatial_combinations(self, data, M=1):
         h, w, c = data.shape
         #Test to see if it is possible to use a magnitude as scaling fator for amount of samples to mix from
         size = 2*M
@@ -687,6 +690,22 @@ class HyperX_patches(torch.utils.data.Dataset):
             alphas = np.random.uniform(0.01, 1, size=patch.shape[0])
             new_image[x,y,:] = np.dot(np.transpose(patch), alphas)/np.sum(alphas)
         return new_image
+
+    def spectral_mean(self, data, M=1):
+        new_data = np.copy(data)
+        bands = 2*M
+        channels = data.shape[-1]
+        chunks = channels//bands
+        for i in range(chunks):
+            new_data[:,:,channels*i//chunks:channels*(i+1)//chunks] = np.stack((np.mean(data[:,:,channels*i//chunks:channels*(i+1)//chunks], axis=2) for _ in range(bands)), axis=2)
+        return new_data
+
+    def moving_average(self, data, M=1):
+        new_data = np.copy(data)
+        channels = data.shape[-1]
+        for i in range(channels):
+            new_data[:,:,i] = np.mean(data[:,:,i-M:i+M], axis=2)
+        return new_data
 
     def identity(data):
         return data
@@ -721,6 +740,13 @@ class HyperX_patches(torch.utils.data.Dataset):
                 data = self.cutout_spatial(data)
             if self.spectral_cutout_aug and np.random.random() < 0.5:
                 data = self.cutout_spectral(data, self.M)
+            if self.spatial_comb and np.random.random() < 0.5:
+                data = self.spatial_combinations(data, self.M)
+            if self.mean_spectral and np.random.random() < 0.5:
+                data = self.spectral_mean(data, self.M)
+            if self.spectral_mvavg and np.random.random() < 0.5:
+                data = self.moving_average(data, self.M)
+
 
             # Copy the data into numpy arrays (PyTorch doesn't like numpy views)
             data = np.asarray(np.copy(data).transpose((2, 0, 1)), dtype='float32')

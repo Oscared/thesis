@@ -73,6 +73,12 @@ def main(raw_args=None):
                         help='use to cutout spectral for data augmentation')
     parser.add_argument('--augmentation_magnitude', type=int, default=1,
                         help='Magnitude of augmentation (so far only for cutout). Defualts to 1, min 1 and max 10.')
+    parser.add_argument('--spatial_combinations', action='store_true',
+                        help='use to spatial combine for data augmentation')
+    parser.add_argument('--spectral_mean', action='store_true',
+                        help='use to spectal mean for data augmentation')
+    parser.add_argument('--moving_average', action='store_true',
+                        help='use to sprectral moving average for data augmentation')
 
     parser.add_argument('--results', type=str, default='results',
                         help='where to save results to (default results)')
