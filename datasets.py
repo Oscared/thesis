@@ -515,6 +515,7 @@ class HyperX_patches(torch.utils.data.Dataset):
         self.pca_strength = args['pca_strength']
         self.spatial_cutout_aug = args['cutout_spatial']
         self.spectral_cutout_aug = args['cutout_spectral']
+        self.M = args['augmentation_magnitude']
 
         self.center_pixel = args['center_pixel']
         self.labeled = labeled
@@ -613,42 +614,42 @@ class HyperX_patches(torch.utils.data.Dataset):
     #[0 0 0 0 0]
     #[0 0 0 0 0]
     #fucked up augmentation purely made for 5x5 patches...
-    def cutout_spatial(image):
+    def cutout_spatial(self, image):
         cutout_image = image
         y = np.random.choice([-1,0,1])
         if y == 0:
             x = np.random.choice([-1,1])
             x_step = 2*x
-            x1 = np.min(x, x_step) + 2
-            x2 = np.max(x, x_step) + 2
+            x1 = np.min([x, x_step]) + 2
+            x2 = np.max([x, x_step]) + 2
 
             y_step = np.random.choice([-1,1])
-            y1 = np.min(y, y_step) + 2
-            y2 = np.max(y, y_step) + 2
+            y1 = np.min([y, y_step]) + 2
+            y2 = np.max([y, y_step]) + 2
         else:
             x = np.random.choice([-1,0,1])
             if x == 0:
                 x_step = np.random.choice([-1,1])
-                x1 = np.min(x, x_step) + 2
-                x2 = np.max(x, x_step) + 2
+                x1 = np.min([x, x_step]) + 2
+                x2 = np.max([x, x_step]) + 2
             else:
                 x_step = np.random.choice([-1,1])
-                x1 = np.min(x, x_step) + 2
-                x2 = np.max(x, x_step) + 2
+                x1 = np.min([x, x_step]) + 2
+                x2 = np.max([x, x_step]) + 2
             y_step = 2*y
-            y1 = np.min(y, y_step) + 2
-            y2 = np.max(y, y_step) + 2
+            y1 = np.min([y, y_step]) + 2
+            y2 = np.max([y, y_step]) + 2
         cutout_image[y1:y2,x1:x2,:] = 0
         return cutout_image
     #Hyperspectral cutout method to cutout part of the spectral bands
-    def cutout_spectral(image, M=1):
+    def cutout_spectral(self, image, M=1):
         h, w, channels = image.shape
         #See if magnitude works as factor
-        cutouts = 5*M
+        cutouts = 1*M
         bands = 5*M
         new_image = image
         for _ in range(cutouts):
-            c = np.random.randint(c)
+            c = np.random.randint(channels)
             c1 = np.clip(c - bands // 2, 0, channels)
             c2 = np.clip(c1 + bands, 0, channels)
             new_image[:,:,c1:c2] = 0
@@ -708,7 +709,7 @@ class HyperX_patches(torch.utils.data.Dataset):
             if self.spatial_cutout_aug and np.random.random() < 0.5:
                 data = self.cutout_spatial(data)
             if self.spectral_cutout_aug and np.random.random() < 0.5:
-                data = self.cutout_spectral(data)
+                data = self.cutout_spectral(data, self.M)
 
             # Copy the data into numpy arrays (PyTorch doesn't like numpy views)
             data = np.asarray(np.copy(data).transpose((2, 0, 1)), dtype='float32')

@@ -112,6 +112,6 @@ if __name__ == '__main__':
         for m in methods:
             main(['--server', '--sampling_fixed', f, '--method', m, '--runs', str(5), '--epochs', str(30), '--dataset', 'Pavia'])
     """
-    cutout = ['none', 'spatial', 'spectral']
+    cutout = ['spatial', 'spectral']
     for c in cutout:
         main(['--server', '--runs', str(3), '--cutout', c, '--epochs', '10'])
