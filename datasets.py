@@ -795,12 +795,20 @@ class HyperX_patches(torch.utils.data.Dataset):
                 # Perform data augmentation (only on 2D patches)
                 data_weak, label_weak = self.flip(data_weak, label_weak)
                 data_strong, label_strong = self.flip(data_strong, label_strong)
-            if np.random.rand() < 0.7:
+            if np.random.rand() < 0.5:
                 data_strong = self.radiation_noise(data_strong)
             #if np.random.rand() < 0.7:
                 #data_strong = self.mixture_noise(data_strong, label_strong)
-            if np.random.rand() < 0.7:
+            if np.random.rand() < 0.5:
                 data_strong = self.pca_augmentation(data_strong, label_strong, M=self.pca_strength)
+            if np.random.random() < 0.5:
+                data_strong = self.spatial_combinations(data_strong, self.M)
+            if np.random.random() < 0.5:
+                data_strong = self.spectral_mean(data_strong, self.M)
+            if np.random.random() < 0.5:
+                data_strong = self.moving_average(data_strong, self.M)
+
+            data_strong = self.cutout_spatial(data_strong)
 
             # Copy the data into numpy arrays (PyTorch doesn't like numpy views)
             data_weak = np.asarray(np.copy(data_weak).transpose((2, 0, 1)), dtype='float32')

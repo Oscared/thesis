@@ -37,6 +37,8 @@ def main(raw_args=None):
                         help='Strength of PCA augmentation')
     parser.add_argument('--augment', type=str, default='none',
                         help='augmentations')
+    parser.add_argument('--M', type=int, default=1,
+                        help='M')
 
     args = parser.parse_args(raw_args)
 
@@ -62,7 +64,7 @@ def main(raw_args=None):
         print('No dataset by right name')
 
     avg_acc = np.zeros(folds)
-    writer = SummaryWriter('results/{}/{}/'.format(args.run_name, args.augment))
+    writer = SummaryWriter('results/{}/overall/{}/'.format(args.run_name, args.augment))
 
     writer.add_text('Arguments', str(args))
 
@@ -71,13 +73,13 @@ def main(raw_args=None):
             print('Running: ' + str(r) + 'time and: ' + str(f) + ' fold.')
             if args.method == 'supervised':
                 if args.augment == 'none':
-                    supervised_args = ['--class_balancing', '--dataset', args.dataset, '--data_dir', data_path.format(data_folder), '--results', 'results/{}/'.format(args.run_name),'--epochs', '{}'.format(args.epochs), '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size), '--fold', '{}'.format(f), '--cuda', '0', '--sampling_fixed', args.sampling_fixed]
+                    supervised_args = ['--class_balancing', '--dataset', args.dataset, '--data_dir', data_path.format(data_folder), '--results', 'results/{}/{}/'.format(args.run_name, args.augment),'--epochs', '{}'.format(args.epochs), '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size), '--fold', '{}'.format(f), '--cuda', '0', '--sampling_fixed', args.sampling_fixed]
                 elif args.augment == 'spatial_combinations':
-                    supervised_args = ['--spatial_combinations', '--class_balancing', '--dataset', args.dataset, '--data_dir', data_path.format(data_folder), '--results', 'results/{}/'.format(args.run_name),'--epochs', '{}'.format(args.epochs), '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size), '--fold', '{}'.format(f), '--cuda', '0', '--sampling_fixed', args.sampling_fixed]
+                    supervised_args = ['--augmentation_magnitude', str(args.M), '--spatial_combinations', '--class_balancing', '--dataset', args.dataset, '--data_dir', data_path.format(data_folder), '--results', 'results/{}/{}/'.format(args.run_name, args.augment),'--epochs', '{}'.format(args.epochs), '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size), '--fold', '{}'.format(f), '--cuda', '0', '--sampling_fixed', args.sampling_fixed]
                 elif args.augment == 'spectral_mean':
-                    supervised_args = ['--spectral_mean', '--class_balancing', '--dataset', args.dataset, '--data_dir', data_path.format(data_folder), '--results', 'results/{}/'.format(args.run_name),'--epochs', '{}'.format(args.epochs), '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size), '--fold', '{}'.format(f), '--cuda', '0', '--sampling_fixed', args.sampling_fixed]
+                    supervised_args = ['--augmentation_magnitude', str(args.M), '--spectral_mean', '--class_balancing', '--dataset', args.dataset, '--data_dir', data_path.format(data_folder), '--results', 'results/{}/{}/'.format(args.run_name, args.augment),'--epochs', '{}'.format(args.epochs), '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size), '--fold', '{}'.format(f), '--cuda', '0', '--sampling_fixed', args.sampling_fixed]
                 elif args.augment == 'moving_average':
-                    supervised_args = ['--moving_average', '--class_balancing', '--dataset', args.dataset, '--data_dir', data_path.format(data_folder), '--results', 'results/{}/'.format(args.run_name),'--epochs', '{}'.format(args.epochs), '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size), '--fold', '{}'.format(f), '--cuda', '0', '--sampling_fixed', args.sampling_fixed]
+                    supervised_args = ['--augmentation_magnitude', str(args.M), '--moving_average', '--class_balancing', '--dataset', args.dataset, '--data_dir', data_path.format(data_folder), '--results', 'results/{}/{}/'.format(args.run_name, args.augment),'--epochs', '{}'.format(args.epochs), '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size), '--fold', '{}'.format(f), '--cuda', '0', '--sampling_fixed', args.sampling_fixed]
                 result = supervised(supervised_args)
             elif args.method == 'mixup':
                 result = mixup(['--class_balancing', '--dataset', args.dataset, '--data_dir', data_path.format(data_folder), '--results', 'results/{}/'.format(args.run_name),'--epochs', '{}'.format(args.epochs), '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size), '--fold', '{}'.format(f), '--cuda', '0', '--sampling_fixed', args.sampling_fixed])
@@ -114,6 +116,8 @@ if __name__ == '__main__':
         for m in methods:
             main(['--server', '--sampling_fixed', f, '--method', m, '--runs', str(5), '--epochs', str(30), '--dataset', 'Pavia'])
     """
-    aug = ['spatial_combinations', 'moving_average']
+    aug = ['spatial_combinations', 'moving_average', 'spectral_mean']
+    M = [2, 4, 8]
     for c in aug:
-        main(['--server', '--runs', str(3), '--augment', c, '--epochs', '10'])
+        for m in M:
+            main(['--server', '--runs', str(3), '--augment', c, '--epochs', '10', '--M', str(m)])
