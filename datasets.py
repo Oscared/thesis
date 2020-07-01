@@ -687,8 +687,11 @@ class HyperX_patches(torch.utils.data.Dataset):
                     if np.sum(patch[p,:])==0:
                         delete_idx.append(p)
                 patch = np.delete(patch, delete_idx, 0)
-            alphas = np.random.uniform(0.01, 1, size=patch.shape[0])
-            new_image[x,y,:] = np.dot(np.transpose(patch), alphas)/np.sum(alphas)
+                if patch.shape[0] == 0:
+                    new_image[x,y,:] = 0
+                else:
+                    alphas = np.random.uniform(0.01, 1, size=patch.shape[0])
+                    new_image[x,y,:] = np.dot(np.transpose(patch), alphas)/np.sum(alphas)
         return new_image
 
     def spectral_mean(self, data, M=1):
@@ -704,7 +707,9 @@ class HyperX_patches(torch.utils.data.Dataset):
         new_data = np.copy(data)
         channels = data.shape[-1]
         for i in range(channels):
-            new_data[:,:,i] = np.mean(data[:,:,i-M:i+M], axis=2)
+            c1 = np.clip(i-M, 0, channels)
+            c2 = np.clip(i+M, 0, channels)
+            new_data[:,:,i] = np.mean(data[:,:,c1:c2], axis=2)
         return new_data
 
     def identity(data):
