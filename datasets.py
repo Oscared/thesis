@@ -8,6 +8,7 @@ from tqdm import tqdm
 from sklearn import preprocessing
 from sklearn.decomposition import PCA
 import utils
+import math
 
 try:
     # Python 3
@@ -698,9 +699,11 @@ class HyperX_patches(torch.utils.data.Dataset):
         new_data = np.copy(data)
         bands = 2*M
         channels = data.shape[-1]
-        chunks = channels//bands
-        for i in range(chunks):
-            new_data[:,:,channels*i//chunks:channels*(i+1)//chunks] = np.stack((np.mean(data[:,:,channels*i//chunks:channels*(i+1)//chunks], axis=2) for _ in range(bands)), axis=2)
+        chunks = channels/bands
+        for i in range(math.ceil(chunks)):
+            new_data[:,:,int(channels*i/chunks):int(channels*(i+1)/chunks)] = \
+            np.stack((np.mean(data[:,:,int(channels*i/chunks):int(channels*(i+1)/chunks)], axis=2) \
+            for _ in range(new_data[:,:,int(channels*i/chunks):int(channels*(i+1)/chunks)].shape[-1])), axis=2)
         return new_data
 
     def moving_average(self, data, M=1):

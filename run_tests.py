@@ -116,8 +116,8 @@ if __name__ == '__main__':
         for m in methods:
             main(['--server', '--sampling_fixed', f, '--method', m, '--runs', str(5), '--epochs', str(30), '--dataset', 'Pavia'])
     """
-    aug = ['spatial_combinations', 'moving_average', 'spectral_mean']
-    M = [2, 4, 8]
+    aug = ['spectral_mean']
+    M = [4, 8]
     for c in aug:
         for m in M:
             main(['--server', '--runs', str(3), '--augment', c, '--epochs', '10', '--M', str(m)])
