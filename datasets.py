@@ -560,7 +560,7 @@ class HyperX_patches(torch.utils.data.Dataset):
         self.data_mean = np.mean(self.data, axis=(0,1,2))
 
         centered_data = self.data - self.data_mean
-        data_train = np.array([self.data[p_l, x_l, y_l] for p_l, x_l, y_l in self.idx])
+        data_train = np.array([centered_data[p_l, x_l, y_l] for p_l, x_l, y_l in self.idx])
         self.pca = PCA(n_components=11)
         self.pca.fit(data_train)
 
