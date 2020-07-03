@@ -98,6 +98,8 @@ def main(raw_args=None):
                         help='Amount of samples to sample for each class when sampling a fixed amount. Defaults to 10.')
 
 
+    parser.add_argument('--pretrain', type=int, default=0,
+                        help='amount of epochs to train on only labeled samples. Defaults to 0.')
     parser.add_argument('--supervision', type=str, default='full',
                         help='check this more, use to make us of all labeled or not, full or semi')
 
@@ -394,7 +396,10 @@ def train(net, optimizer, criterion_labeled, criterion_unlabeled, criterion_val,
 
             Lu = (criterion_unlabeled(logits_u_s, targets_u) * mask).mean()
 
-            loss = Lx + 1 * Lu
+            if e < args.pretrain:
+                loss = Lx
+            else:
+                loss = Lx + 1 * Lu
 
 
             optimizer.zero_grad()

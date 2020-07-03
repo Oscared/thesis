@@ -115,9 +115,13 @@ if __name__ == '__main__':
     for f in fixed_sampling:
         for m in methods:
             main(['--server', '--sampling_fixed', f, '--method', m, '--runs', str(5), '--epochs', str(30), '--dataset', 'Pavia'])
-    """
+
     aug = ['spatial_combinations', 'moving_average', 'spectral_mean']
     M = [10, 12, 15, 20]
     for c in aug:
         for m in M:
             main(['--server', '--runs', str(3), '--augment', c, '--epochs', '10', '--M', str(m)])
+    """
+    fixed_sampling = ['False', 'True']
+    for f in fixed_sampling:
+        main(['--server', '--runs', str(3), '--epochs', str(50), '--method', 'fixmatch', '--sampling_fixed', f])

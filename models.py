@@ -103,7 +103,7 @@ class NalepaEtAl(nn.Module):
 
         self.conv = nn.Conv1d(1, 200, 5)
         self.bn = nn.BatchNorm1d(200)
-        self.pool = nn.MaxPool(2)
+        self.pool = nn.MaxPool2d(2)
 
         self.feature_size = self._get_final_flattened_size()
 
@@ -114,9 +114,9 @@ class NalepaEtAl(nn.Module):
     def _get_final_flattened_size(self):
         with torch.no_grad():
             x = torch.zeros((1, 1, self.input_channels))
-            x = self.pool1(self.conv(x))
-            _, t, c, w, h = x.size()
-        return t * c * w * h
+            x = self.pool(self.conv(x))
+            _, t, c = x.size()
+        return t * c
 
     def forward(self, x):
         x = F.relu(self.conv(x))

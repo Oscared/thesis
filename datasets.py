@@ -697,7 +697,7 @@ class HyperX_patches(torch.utils.data.Dataset):
 
     def spectral_mean(self, data, M=1):
         new_data = np.copy(data)
-        bands = 2*M
+        bands = 4*M
         channels = data.shape[-1]
         chunks = channels/bands
         for i in range(math.ceil(chunks)):
@@ -709,9 +709,10 @@ class HyperX_patches(torch.utils.data.Dataset):
     def moving_average(self, data, M=1):
         new_data = np.copy(data)
         channels = data.shape[-1]
+        bands = 2*M
         for i in range(channels):
-            c1 = np.clip(i-M, 0, channels)
-            c2 = np.clip(i+M, 0, channels)
+            c1 = np.clip(i-bands, 0, channels)
+            c2 = np.clip(i+bands, 0, channels)
             new_data[:,:,i] = np.mean(data[:,:,c1:c2], axis=2)
         return new_data
 
