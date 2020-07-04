@@ -122,8 +122,13 @@ if __name__ == '__main__':
         for m in M:
             main(['--server', '--runs', str(3), '--augment', c, '--epochs', '10', '--M', str(m)])
     """
+    """
     fixed_sampling = ['False', 'True']
     M = [2, 6, 10, 14]
     for f in fixed_sampling:
         for m in M:
             main(['--server', '--runs', str(3), '--epochs', str(50), '--method', 'fixmatch', '--sampling_fixed', f, '--M', str(m)])
+    """
+    fixed_sampling = ['False', 'True']
+    for f in fixed_sampling:
+        main(['--server', '--runs', str(3), '--epochs', str(50), '--method', 'supervised', '--sampling_fixed', f])

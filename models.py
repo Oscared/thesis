@@ -119,9 +119,11 @@ class NalepaEtAl(nn.Module):
         return t * c
 
     def forward(self, x):
+        x = x.squeeze(dim=-1).squeeze(dim=-1)
+        x = x.unsqueeze(1)
         x = F.relu(self.conv(x))
         x = self.pool(x)
-        x = x.view(-1, self.features_size)
+        x = x.view(-1, self.feature_size)
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
         x = self.fc3(x)
