@@ -57,6 +57,8 @@ def main(raw_args=None):
                         help='use to balance weights according to ratio in dataset')
     parser.add_argument('--checkpoint', type=str, default=None,
                         help='use to load model weights from a certain directory')
+    parser.add_argument('--model', type=str, default='3D',
+                        help='Choose model. Possible is 3D or 1D. Defaults to 3D.')
     #Augmentation arguments
     parser.add_argument('--flip_augmentation', action='store_true',
                         help='use to flip augmentation data for use')
@@ -116,6 +118,9 @@ def main(raw_args=None):
     os.makedirs(tensorboard_dir, exist_ok=True)
     writer = SummaryWriter(tensorboard_dir)
 
+    if args.model == '1D':
+        args.patch_size = 1
+
     if args.sampling_mode == 'nalepa':
         train_img, train_gt, test_img, test_gt, label_values, ignored_labels, rgb_bands, palette = get_patch_data(args.dataset, args.patch_size, target_folder=args.data_dir, fold=args.fold)
         args.n_bands = train_img.shape[-1]
@@ -155,8 +160,11 @@ def main(raw_args=None):
         utils.display_predictions(convert_to_color(test_gt), vis, writer=writer,
                                     caption="Test ground truth")
 
-    model = HamidaEtAl(args.n_bands, args.n_classes,
-                       patch_size=args.patch_size)
+    if args.model == '3D':
+        model = HamidaEtAl(args.n_bands, args.n_classes,
+                           patch_size=args.patch_size)
+    if args.model == '1D':
+        model = NalepaEtAl(args.n_bands, args.n_classes)
 
     optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=0.9,
                           nesterov=True, weight_decay=0.0005)

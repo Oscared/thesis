@@ -37,7 +37,7 @@ def main(raw_args=None):
                         help='Strength of PCA augmentation')
     parser.add_argument('--augment', type=str, default='none',
                         help='augmentations')
-    parser.add_argument('--M', type=int, default=1,
+    parser.add_argument('--M', type=int, default=10,
                         help='M')
     parser.add_argument('--pretrain', type=int, default=0,
                         help='pretrain epochs')
@@ -111,19 +111,20 @@ def main(raw_args=None):
     writer.close()
 
 if __name__ == '__main__':
-    """
-    methods = ['supervised', 'mixup', 'fixmatch']
+
+    methods = ['fixmatch', 'supervised']
     fixed_sampling = ['False', 'True']
     for f in fixed_sampling:
         for m in methods:
-            main(['--server', '--sampling_fixed', f, '--method', m, '--runs', str(5), '--epochs', str(30), '--dataset', 'Pavia'])
-
+            main(['--server', '--sampling_fixed', f, '--method', m, '--runs', str(3), '--epochs', str(30), '--model', '1D'])
+    """
     aug = ['spatial_combinations', 'moving_average', 'spectral_mean']
     M = [10, 12, 15, 20]
     for c in aug:
         for m in M:
             main(['--server', '--runs', str(3), '--augment', c, '--epochs', '10', '--M', str(m)])
     """
+
     """
     fixed_sampling = ['False', 'True']
     M = [2, 6, 10, 14]
@@ -131,9 +132,12 @@ if __name__ == '__main__':
         for m in M:
             main(['--server', '--runs', str(3), '--epochs', str(50), '--method', 'fixmatch', '--sampling_fixed', f, '--M', str(m)])
     """
+
+    """
     pretrain = ['5', '10', '15']
     for p in pretrain:
         main(['--server', '--runs', str(3), '--epochs', str(50), '--method', 'fixmatch', '--sampling_fixed', 'False', '--pretrain', p])
     pretrain = ['10', '20', '30']
     for p in pretrain:
         main(['--server', '--runs', str(3), '--epochs', str(100), '--method', 'fixmatch', '--sampling_fixed', 'True', '--pretrain', p])
+    """
