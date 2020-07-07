@@ -15,6 +15,7 @@ import torch.utils.data as data
 #from torchsummary import summary
 #from torch.utils.tensorboard  import SummaryWriter
 from tensorboardX import SummaryWriter
+from models import NalepaEtAl
 
 import math
 import os
