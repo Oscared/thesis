@@ -805,7 +805,7 @@ class HyperX_patches(torch.utils.data.Dataset):
                 #data_strong = self.mixture_noise(data_strong, label_strong)
             if np.random.rand() < 0.5:
                 data_strong = self.pca_augmentation(data_strong, label_strong, M=self.pca_strength)
-            if np.random.random() < 0.5:
+            if np.random.random() < 0.5 and self.patch_size > 1:
                 data_strong = self.spatial_combinations(data_strong, self.M)
             if np.random.random() < 0.5:
                 data_strong = self.spectral_mean(data_strong, self.M)
@@ -822,6 +822,10 @@ class HyperX_patches(torch.utils.data.Dataset):
             # Load the data into PyTorch tensors
             data_weak = torch.from_numpy(data_weak)
             data_strong = torch.from_numpy(data_strong)
+
+            if self.patch_size == 1:
+                data_weak = data_weak[:, 0, 0]
+                data_strong = data_strong[:, 0, 0]
 
             # Add a fourth dimension for 3D CNN
             if self.patch_size > 1:
