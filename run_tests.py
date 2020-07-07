@@ -86,7 +86,7 @@ def main(raw_args=None):
             elif args.method == 'mixup':
                 result = mixup(['--class_balancing', '--dataset', args.dataset, '--data_dir', data_path.format(data_folder), '--results', 'results/{}/'.format(args.run_name),'--epochs', '{}'.format(args.epochs), '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size), '--fold', '{}'.format(f), '--cuda', '0', '--sampling_fixed', args.sampling_fixed])
             elif args.method == 'fixmatch':
-                result = fixmatch(['--pretrain', str(args.pretrain)'--augmentation_magnitude', str(args.M), '--class_balancing', '--dataset', args.dataset, '--data_dir', data_path.format(data_folder), '--results', 'results/{}/'.format(args.run_name),'--epochs', '{}'.format(args.epochs), '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size), '--fold', '{}'.format(f), '--cuda', '0', '--sampling_fixed', args.sampling_fixed, '--threshold', '{}'.format(args.threshold)])
+                result = fixmatch(['--pretrain', str(args.pretrain), '--augmentation_magnitude', str(args.M), '--class_balancing', '--dataset', args.dataset, '--data_dir', data_path.format(data_folder), '--results', 'results/{}/'.format(args.run_name),'--epochs', '{}'.format(args.epochs), '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size), '--fold', '{}'.format(f), '--cuda', '0', '--sampling_fixed', args.sampling_fixed, '--threshold', '{}'.format(args.threshold)])
             else:
                 print('No method with this name')
                 results = None
