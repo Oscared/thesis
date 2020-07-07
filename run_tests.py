@@ -31,7 +31,8 @@ def main(raw_args=None):
                         help='Confidence threshold for fixmatch method. Defaults to 0.95.')
     parser.add_argument('--sampling_fixed', type=str, default='False',
                         help='Use to sample a fixed amount of samples per class for nalepa sampling.')
-
+    parser.add_argument('--model', type=str, default='3D',
+                        help='Model to use 3D or 1D CNN. Defaults to 3D.')
 
     parser.add_argument('--pca_strength', type=float, default=1,
                         help='Strength of PCA augmentation')
@@ -75,7 +76,7 @@ def main(raw_args=None):
             print('Running: ' + str(r) + 'time and: ' + str(f) + ' fold.')
             if args.method == 'supervised':
                 if args.augment == 'none':
-                    supervised_args = ['--class_balancing', '--dataset', args.dataset, '--data_dir', data_path.format(data_folder), '--results', 'results/{}/{}/'.format(args.run_name, args.augment),'--epochs', '{}'.format(args.epochs), '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size), '--fold', '{}'.format(f), '--cuda', '0', '--sampling_fixed', args.sampling_fixed]
+                    supervised_args = ['--model', args.model, '--class_balancing', '--dataset', args.dataset, '--data_dir', data_path.format(data_folder), '--results', 'results/{}/{}/'.format(args.run_name, args.augment),'--epochs', '{}'.format(args.epochs), '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size), '--fold', '{}'.format(f), '--cuda', '0', '--sampling_fixed', args.sampling_fixed]
                 elif args.augment == 'spatial_combinations':
                     supervised_args = ['--augmentation_magnitude', str(args.M), '--spatial_combinations', '--class_balancing', '--dataset', args.dataset, '--data_dir', data_path.format(data_folder), '--results', 'results/{}/{}/'.format(args.run_name, args.augment),'--epochs', '{}'.format(args.epochs), '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size), '--fold', '{}'.format(f), '--cuda', '0', '--sampling_fixed', args.sampling_fixed]
                 elif args.augment == 'spectral_mean':
@@ -86,7 +87,7 @@ def main(raw_args=None):
             elif args.method == 'mixup':
                 result = mixup(['--class_balancing', '--dataset', args.dataset, '--data_dir', data_path.format(data_folder), '--results', 'results/{}/'.format(args.run_name),'--epochs', '{}'.format(args.epochs), '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size), '--fold', '{}'.format(f), '--cuda', '0', '--sampling_fixed', args.sampling_fixed])
             elif args.method == 'fixmatch':
-                result = fixmatch(['--pretrain', str(args.pretrain), '--augmentation_magnitude', str(args.M), '--class_balancing', '--dataset', args.dataset, '--data_dir', data_path.format(data_folder), '--results', 'results/{}/'.format(args.run_name),'--epochs', '{}'.format(args.epochs), '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size), '--fold', '{}'.format(f), '--cuda', '0', '--sampling_fixed', args.sampling_fixed, '--threshold', '{}'.format(args.threshold)])
+                result = fixmatch(['--model', args.model, '--pretrain', str(args.pretrain), '--augmentation_magnitude', str(args.M), '--class_balancing', '--dataset', args.dataset, '--data_dir', data_path.format(data_folder), '--results', 'results/{}/'.format(args.run_name),'--epochs', '{}'.format(args.epochs), '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size), '--fold', '{}'.format(f), '--cuda', '0', '--sampling_fixed', args.sampling_fixed, '--threshold', '{}'.format(args.threshold)])
             else:
                 print('No method with this name')
                 results = None
