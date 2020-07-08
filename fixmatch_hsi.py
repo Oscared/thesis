@@ -125,6 +125,33 @@ def main(raw_args=None):
     if args.sampling_mode == 'nalepa':
         train_img, train_gt, test_img, test_gt, label_values, ignored_labels, rgb_bands, palette = get_patch_data(args.dataset, args.patch_size, target_folder=args.data_dir, fold=args.fold)
         args.n_bands = train_img.shape[-1]
+
+        if args.dataset == 'pavia':
+            train_img, train_gt, test_img, test_gt, label_values, ignored_labels, rgb_bands, palette = get_patch_data('pavia', args.patch_size, target_folder=args.data_dir, fold=args.fold)
+            args.n_bands = train_img.shape[-1]
+            img_unlabeled, _, _, _, _, _ = get_dataset('PaviaC', target_folder='/data/')
+            gt_unlabeled = np.zeros((img_unlabeled.shape[0], img_unlabeled.shape[1]))
+            gt_1 = gt_unlabeled[:,:223]
+            gt_2 = gt_unlabeled[:,223:]
+            img_1 = img_unlabeled[:,:223,:]
+            img_2 = img_unlabeled[:,223:,:]
+
+            pad_width = args.patch_size // 2
+
+            img_1 = np.pad(img_1, ((pad_width, pad_width), (pad_width, pad_width), (0,0)))
+            gt_1 = np.pad(gt_1, ((pad_width, pad_width), (pad_width, pad_width)))
+
+            img_2 = np.pad(img_2, ((pad_width, pad_width), (pad_width, pad_width), (0,0)))
+            gt_2 = np.pad(gt_2, ((pad_width, pad_width), (pad_width, pad_width)))
+
+            img_1 = img_1.reshape(1, img_1.shape[0], img_1.shape[1], img_1.shape[2])
+            idx_1 = np.array([(0,x,y) for x in range(pad_width,gt_1.shape[0]-pad_width) for y in range(pad_width,gt_1.shape[1]-pad_width)])
+
+            img_2 = img_2.reshape(1, img_2.shape[0], img_2.shape[1], img_2.shape[2])
+            idx_2 = np.array([(0,x,y) for x in range(pad_width,gt_2.shape[0]-pad_width) for y in range(pad_width,gt_2.shape[1]-pad_width)])
+
+            img_1 = np.concatenate((img_1, img_1[:,:,:,-1, np.newaxis]), axis=-1)
+            img_2 = np.concatenate((img_2, img_2[:,:,:,-1, np.newaxis]), axis=-1)
     else:
         img, gt, label_values, ignored_labels, rgb_bands, palette = get_dataset(args.dataset, target_folder=args.data_dir)
         args.n_bands = img.shape[-1]
@@ -210,6 +237,10 @@ def main(raw_args=None):
         unlabeled_ratio = math.ceil(len(idx_unsup)/len(idx_sup))
 
         train_unlabeled_dataset = HyperX_patches(train_img, train_gt, idx_unsup, labeled=False, **vars(args))
+        if args.dataset == 'pavia':
+            train_unlabeled_dataset = data.ConcatDataset([train_unlabeled_dataset,
+                                                          HyperX_patches(img_1, gt_1, idx_1, labeled=False, **vars(args)),
+                                                          HyperX_patches(img_2, gt_2, idx_2, labeled=False, **vars(args))])
         train_unlabeled_loader = data.DataLoader(train_unlabeled_dataset, batch_size=args.batch_size*unlabeled_ratio,
                                        pin_memory=True, num_workers=5,
                                        shuffle=True, drop_last=True)

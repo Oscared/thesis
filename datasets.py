@@ -87,7 +87,17 @@ def get_dataset(dataset_name, target_folder=dataset_path):
 
         ignored_labels = [0]
 
+    elif dataset_name == 'PaviaC':
+        img = open_file(folder + 'Pavia.mat')['pavia']
 
+        rgb_bands = (55, 41, 12)
+
+        #gt = np.zeros(img.shape)
+        gt = open_file(folder + 'Pavia_gt.mat')['pavia_gt']
+
+        label_values = None
+
+        ignored_labels = [0]
     else:
         print("Error: no dataset of the requested type found. Available datasets are PaviaU, Salinas.")
 
@@ -598,7 +608,7 @@ class HyperX_patches(torch.utils.data.Dataset):
         return (alpha1 * data + alpha2 * data2) / (alpha1 + alpha2) + beta * noise
 
     #PCA augmentation technique. Adds noise in pca space and transform back
-    def pca_augmentation(self, data, label, M=1):
+    def pca_augmentation(self, data, M=1):
         data_aug = np.zeros_like(data)
         data_train = data - self.data_mean
         for idx, _ in np.ndenumerate(data[:,:,0]):
@@ -744,7 +754,7 @@ class HyperX_patches(torch.utils.data.Dataset):
             if self.mixture_augmentation and np.random.random() < 0.5:
                 data = self.mixture_noise(data, label)
             if self.pca_aug and np.random.random() < 0.5:
-                data = self.pca_augmentation(data, label, M=self.pca_strength)
+                data = self.pca_augmentation(data, M=self.pca_strength)
             if self.spatial_cutout_aug and np.random.random() < 0.5:
                 data = self.cutout_spatial(data)
             if self.spectral_cutout_aug and np.random.random() < 0.5:
@@ -790,21 +800,24 @@ class HyperX_patches(torch.utils.data.Dataset):
 
             data_weak = self.data[p, x1:x2, y1:y2]
             data_strong = np.copy(data_weak)
+            #print(data_strong.shape)
             #This will currently not work with data that has no labels, it doesnt harm it right now either though...
             # i.e. it is a zero matrix
-            label_weak = self.label[p, x1:x2, y1:y2]
-            label_strong = np.copy(label_weak)
+            #label_weak = self.label[p, x1:x2, y1:y2]
+            #label_strong = np.copy(label_weak)
 
             if self.flip_augmentation and self.patch_size > 1:
                 # Perform data augmentation (only on 2D patches)
-                data_weak, label_weak = self.flip(data_weak, label_weak)
-                data_strong, label_strong = self.flip(data_strong, label_strong)
+                #data_weak, label_weak = self.flip(data_weak, label_weak)
+                #data_strong, label_strong = self.flip(data_strong, label_strong)
+                data_weak = self.flip(data_weak)
+                data_strong = self.flip(data_strong)
             if np.random.rand() < 0.5:
                 data_strong = self.radiation_noise(data_strong)
             #if np.random.rand() < 0.7:
                 #data_strong = self.mixture_noise(data_strong, label_strong)
             if np.random.rand() < 0.5:
-                data_strong = self.pca_augmentation(data_strong, label_strong, M=self.pca_strength)
+                data_strong = self.pca_augmentation(data_strong, M=self.pca_strength)
             if np.random.random() < 0.5 and self.patch_size > 1:
                 data_strong = self.spatial_combinations(data_strong, self.M)
             if np.random.random() < 0.5:
