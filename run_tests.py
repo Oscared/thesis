@@ -83,6 +83,8 @@ def main(raw_args=None):
                     supervised_args = ['--augmentation_magnitude', str(args.M), '--spectral_mean', '--class_balancing', '--dataset', args.dataset, '--data_dir', data_path.format(data_folder), '--results', 'results/{}/{}/'.format(args.run_name, args.augment),'--epochs', '{}'.format(args.epochs), '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size), '--fold', '{}'.format(f), '--cuda', '0', '--sampling_fixed', args.sampling_fixed]
                 elif args.augment == 'moving_average':
                     supervised_args = ['--augmentation_magnitude', str(args.M), '--moving_average', '--class_balancing', '--dataset', args.dataset, '--data_dir', data_path.format(data_folder), '--results', 'results/{}/{}/'.format(args.run_name, args.augment),'--epochs', '{}'.format(args.epochs), '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size), '--fold', '{}'.format(f), '--cuda', '0', '--sampling_fixed', args.sampling_fixed]
+                elif args.augment == 'pca':
+                    supervised_args = ['--augmentation_magnitude', str(args.M), '--pca_augmentation', '--class_balancing', '--dataset', args.dataset, '--data_dir', data_path.format(data_folder), '--results', 'results/{}/{}/'.format(args.run_name, args.augment),'--epochs', '{}'.format(args.epochs), '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size), '--fold', '{}'.format(f), '--cuda', '0', '--sampling_fixed', args.sampling_fixed]
                 result = supervised(supervised_args)
             elif args.method == 'mixup':
                 result = mixup(['--class_balancing', '--dataset', args.dataset,
@@ -122,12 +124,13 @@ def main(raw_args=None):
     writer.close()
 
 if __name__ == '__main__':
-
+    """
     fixed_sampling = ['False', 'True']
     model = ['3D', '1D']
     for f in fixed_sampling:
         for m in model:
             main(['--server', '--sampling_fixed', f, '--method', 'fixmatch', '--runs', str(3), '--epochs', str(30), '--model', m, '--dataset', 'Pavia'])
+    """
     """
     aug = ['spatial_combinations', 'moving_average', 'spectral_mean']
     M = [10, 12, 15, 20]
@@ -152,3 +155,4 @@ if __name__ == '__main__':
     for p in pretrain:
         main(['--server', '--runs', str(3), '--epochs', str(100), '--method', 'fixmatch', '--sampling_fixed', 'True', '--pretrain', p])
     """
+    main(['--server', '--runs', str(3), '--augment', 'pca', '--epochs', '10'])

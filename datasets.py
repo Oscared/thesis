@@ -613,9 +613,11 @@ class HyperX_patches(torch.utils.data.Dataset):
         data_train = data - self.data_mean
         for idx, _ in np.ndenumerate(data[:,:,0]):
             x,y = idx
-            alpha = M*np.random.uniform(0.5,1.5)
+            #alpha = M*np.random.uniform(0.5,1.5)
             data_pca = self.pca.transform(data_train[x,y,:].reshape(1,-1))
-            data_pca[:,0] = data_pca[:,0]*alpha
+            #data_pca[:,0] = data_pca[:,0]*alpha
+            alpha = M*np.random.uniform(0.5,1.5,11)
+            data_pca = data_pca*alpha
             data_aug[x,y,:] = self.pca.inverse_transform(data_pca)
         return data_aug
 
