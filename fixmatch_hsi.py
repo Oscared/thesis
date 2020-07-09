@@ -105,6 +105,8 @@ def main(raw_args=None):
                         help='amount of epochs to train on only labeled samples. Defaults to 0.')
     parser.add_argument('--supervision', type=str, default='full',
                         help='check this more, use to make us of all labeled or not, full or semi')
+    parser.add_argument('--extra_data', type=str, default='True',
+                        help='add extra data for pavia dataset. Defaults to true.')
 
     args = parser.parse_args(raw_args)
 
@@ -126,7 +128,7 @@ def main(raw_args=None):
         train_img, train_gt, test_img, test_gt, label_values, ignored_labels, rgb_bands, palette = get_patch_data(args.dataset, args.patch_size, target_folder=args.data_dir, fold=args.fold)
         args.n_bands = train_img.shape[-1]
 
-        if args.dataset == 'Pavia':
+        if args.dataset == 'Pavia' and args.extra_data == 'True':
             print('Extra data Pavia')
             train_img, train_gt, test_img, test_gt, label_values, ignored_labels, rgb_bands, palette = get_patch_data('pavia', args.patch_size, target_folder=args.data_dir, fold=args.fold)
             args.n_bands = train_img.shape[-1]
@@ -238,7 +240,7 @@ def main(raw_args=None):
         unlabeled_ratio = math.ceil(len(idx_unsup)/len(idx_sup))
 
         train_unlabeled_dataset = HyperX_patches(train_img, train_gt, idx_unsup, labeled=False, **vars(args))
-        if args.dataset == 'Pavia':
+        if args.dataset == 'Pavia' and args.extra_data == 'True':
             train_unlabeled_dataset = data.ConcatDataset([train_unlabeled_dataset,
                                                           HyperX_patches(img_1, gt_1, idx_1, labeled=False, **vars(args)),
                                                           HyperX_patches(img_2, gt_2, idx_2, labeled=False, **vars(args))])

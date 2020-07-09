@@ -42,6 +42,9 @@ def main(raw_args=None):
                         help='M')
     parser.add_argument('--pretrain', type=int, default=0,
                         help='pretrain epochs')
+    parser.add_argument('--extra_data', type=str, default='True',
+                        help='extra data for pavia. Defaults to true.')
+
 
     args = parser.parse_args(raw_args)
 
@@ -99,7 +102,7 @@ def main(raw_args=None):
                                    '--results', 'results/{}/'.format(args.run_name),'--epochs', '{}'.format(args.epochs),
                                    '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size),
                                    '--fold', '{}'.format(f), '--cuda', '0', '--sampling_fixed', args.sampling_fixed,
-                                   '--threshold', '{}'.format(args.threshold)])
+                                   '--threshold', '{}'.format(args.threshold)], '--extra_data', args.extra_data)
             else:
                 print('No method with this name')
                 results = None
@@ -124,13 +127,12 @@ def main(raw_args=None):
     writer.close()
 
 if __name__ == '__main__':
-    """
     fixed_sampling = ['False', 'True']
-    model = ['3D', '1D']
+    extra_data = ['True', 'False']
     for f in fixed_sampling:
-        for m in model:
-            main(['--server', '--sampling_fixed', f, '--method', 'fixmatch', '--runs', str(3), '--epochs', str(30), '--model', m, '--dataset', 'Pavia'])
-    """
+        for e in extra_data:
+            main(['--server', '--sampling_fixed', f, '--method', 'fixmatch', '--runs', str(3),
+                  '--epochs', str(100), '--model', m, '--dataset', 'Pavia', '--extra_data', e])
     """
     aug = ['spatial_combinations', 'moving_average', 'spectral_mean']
     M = [10, 12, 15, 20]
@@ -155,4 +157,3 @@ if __name__ == '__main__':
     for p in pretrain:
         main(['--server', '--runs', str(3), '--epochs', str(100), '--method', 'fixmatch', '--sampling_fixed', 'True', '--pretrain', p])
     """
-    main(['--server', '--runs', str(3), '--augment', 'pca', '--epochs', '10'])
