@@ -126,7 +126,8 @@ def main(raw_args=None):
         train_img, train_gt, test_img, test_gt, label_values, ignored_labels, rgb_bands, palette = get_patch_data(args.dataset, args.patch_size, target_folder=args.data_dir, fold=args.fold)
         args.n_bands = train_img.shape[-1]
 
-        if args.dataset == 'pavia':
+        if args.dataset == 'Pavia':
+            print('Extra data Pavia')
             train_img, train_gt, test_img, test_gt, label_values, ignored_labels, rgb_bands, palette = get_patch_data('pavia', args.patch_size, target_folder=args.data_dir, fold=args.fold)
             args.n_bands = train_img.shape[-1]
             img_unlabeled, _, _, _, _, _ = get_dataset('PaviaC', target_folder='/data/')
@@ -237,7 +238,7 @@ def main(raw_args=None):
         unlabeled_ratio = math.ceil(len(idx_unsup)/len(idx_sup))
 
         train_unlabeled_dataset = HyperX_patches(train_img, train_gt, idx_unsup, labeled=False, **vars(args))
-        if args.dataset == 'pavia':
+        if args.dataset == 'Pavia':
             train_unlabeled_dataset = data.ConcatDataset([train_unlabeled_dataset,
                                                           HyperX_patches(img_1, gt_1, idx_1, labeled=False, **vars(args)),
                                                           HyperX_patches(img_2, gt_2, idx_2, labeled=False, **vars(args))])
