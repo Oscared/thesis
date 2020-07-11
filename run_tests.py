@@ -44,6 +44,8 @@ def main(raw_args=None):
                         help='pretrain epochs')
     parser.add_argument('--extra_data', type=str, default='True',
                         help='extra data for pavia. Defaults to true.')
+    parser.add_argument('--samples', type=int, default=10,
+                        help='samples per class when fixed sampling. Defaults to 10.')
 
 
     args = parser.parse_args(raw_args)
@@ -99,10 +101,11 @@ def main(raw_args=None):
                 result = fixmatch(['--model', args.model, '--pretrain', str(args.pretrain),
                                    '--augmentation_magnitude', str(args.M), '--class_balancing',
                                    '--dataset', args.dataset, '--data_dir', data_path.format(data_folder),
-                                   '--results', 'results/{}/'.format(args.run_name),'--epochs', '{}'.format(args.epochs),
+                                   '--results', 'results/{}/{}'.format(args.run_name, str(args.samples)),'--epochs', '{}'.format(args.epochs),
                                    '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size),
                                    '--fold', '{}'.format(f), '--cuda', '0', '--sampling_fixed', args.sampling_fixed,
-                                   '--threshold', '{}'.format(args.threshold), '--extra_data', args.extra_data])
+                                   '--threshold', '{}'.format(args.threshold), '--extra_data', args.extra_data,
+                                   '--samples_per_class', str(args.samples)])
             else:
                 print('No method with this name')
                 results = None
@@ -127,12 +130,18 @@ def main(raw_args=None):
     writer.close()
 
 if __name__ == '__main__':
-    fixed_sampling = ['False', 'True']
+    samples = ['20', '40', '80', '140', '200']
     extra_data = ['True', 'False']
-    for f in fixed_sampling:
-        for e in extra_data:
-            main(['--server', '--sampling_fixed', f, '--method', 'fixmatch', '--runs', str(3),
-                  '--epochs', str(100), '--dataset', 'Pavia', '--extra_data', e])
+    dataset = ['Pavia', 'Salinas']
+    for s in samples:
+        for d in dataset:
+            if d == 'Pavia':
+                for e in extra_data:
+                    main(['--server', '--sampling_fixed', 'True', '--method', 'fixmatch', '--runs', str(2),
+                          '--epochs', str(60), '--dataset', d, '--extra_data', e, '--samples', s])
+            else:
+                main(['--server', '--sampling_fixed', 'True', '--method', 'fixmatch', '--runs', str(2),
+                      '--epochs', str(60), '--dataset', d, '--samples', s])
     """
     aug = ['spatial_combinations', 'moving_average', 'spectral_mean']
     M = [10, 12, 15, 20]

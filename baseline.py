@@ -148,7 +148,6 @@ def main(raw_args=None):
         prediction = clf.predict(test_img.reshape(-1, n_bands))
         prediction = prediction.reshape(test_img.shape[:2])
 
-
     run_results = utils.metrics(prediction, test_gt,
                                 ignored_labels=args.ignored_labels,
                                 n_classes=args.n_classes)
