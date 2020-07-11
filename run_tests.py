@@ -102,7 +102,7 @@ def main(raw_args=None):
                                    '--results', 'results/{}/'.format(args.run_name),'--epochs', '{}'.format(args.epochs),
                                    '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size),
                                    '--fold', '{}'.format(f), '--cuda', '0', '--sampling_fixed', args.sampling_fixed,
-                                   '--threshold', '{}'.format(args.threshold)], '--extra_data', args.extra_data)
+                                   '--threshold', '{}'.format(args.threshold), '--extra_data', args.extra_data])
             else:
                 print('No method with this name')
                 results = None
@@ -132,7 +132,7 @@ if __name__ == '__main__':
     for f in fixed_sampling:
         for e in extra_data:
             main(['--server', '--sampling_fixed', f, '--method', 'fixmatch', '--runs', str(3),
-                  '--epochs', str(100), '--model', m, '--dataset', 'Pavia', '--extra_data', e])
+                  '--epochs', str(100), '--dataset', 'Pavia', '--extra_data', e])
     """
     aug = ['spatial_combinations', 'moving_average', 'spectral_mean']
     M = [10, 12, 15, 20]

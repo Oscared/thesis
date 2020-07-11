@@ -237,7 +237,8 @@ def main(raw_args=None):
                                        pin_memory=True, num_workers=5,
                                        shuffle=True, drop_last=True)
 
-        unlabeled_ratio = math.ceil(len(idx_unsup)/len(idx_sup))
+        #unlabeled_ratio = math.ceil(len(idx_unsup)/len(idx_sup))
+        unlabeled_ratio = 7
 
         train_unlabeled_dataset = HyperX_patches(train_img, train_gt, idx_unsup, labeled=False, **vars(args))
         if args.dataset == 'Pavia' and args.extra_data == 'True':
