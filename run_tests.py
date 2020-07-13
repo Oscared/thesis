@@ -46,6 +46,8 @@ def main(raw_args=None):
                         help='extra data for pavia. Defaults to true.')
     parser.add_argument('--samples', type=int, default=10,
                         help='samples per class when fixed sampling. Defaults to 10.')
+    parser.add_argument('--unlabeled_ratio', type=int, default=7,
+                        help='Ratio of unlabeled samples per batch. Defaults to 7.')
 
 
     args = parser.parse_args(raw_args)
@@ -105,7 +107,7 @@ def main(raw_args=None):
                                    '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size),
                                    '--fold', '{}'.format(f), '--cuda', '0', '--sampling_fixed', args.sampling_fixed,
                                    '--threshold', '{}'.format(args.threshold), '--extra_data', args.extra_data,
-                                   '--samples_per_class', str(args.samples)])
+                                   '--samples_per_class', str(args.samples), '--unlabeled_ratio', str(args.unlabeled_ratio)])
             else:
                 print('No method with this name')
                 results = None
