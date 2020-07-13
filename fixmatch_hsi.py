@@ -234,7 +234,7 @@ def main(raw_args=None):
 
         train_labeled_dataset = HyperX_patches(train_img, train_gt, idx_sup, labeled=True, **vars(args))
         train_labeled_loader = data.DataLoader(train_labeled_dataset, batch_size=args.batch_size,
-                                       pin_memory=True, num_workers=5,
+                                       pin_memory=True, num_workers=10,
                                        shuffle=True, drop_last=True)
 
         #unlabeled_ratio = math.ceil(len(idx_unsup)/len(idx_sup))
@@ -246,7 +246,7 @@ def main(raw_args=None):
                                                           HyperX_patches(img_1, gt_1, idx_1, labeled=False, **vars(args)),
                                                           HyperX_patches(img_2, gt_2, idx_2, labeled=False, **vars(args))])
         train_unlabeled_loader = data.DataLoader(train_unlabeled_dataset, batch_size=args.batch_size*unlabeled_ratio,
-                                       pin_memory=True, num_workers=5,
+                                       pin_memory=True, num_workers=10,
                                        shuffle=True, drop_last=True)
 
         amount_labeled = idx_sup.shape[0]
