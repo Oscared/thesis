@@ -619,6 +619,7 @@ class HyperX_patches(torch.utils.data.Dataset):
             #alpha = M*np.random.uniform(0.5,1.5,11)
             #data_pca = data_pca*alpha
             data_aug[x,y,:] = self.pca.inverse_transform(data_pca)
+        data_aug = data_aug + self.data_mean
         return data_aug
 
     #Cutout augmentation, cut out a random part of the image and replace with ignored label
@@ -791,6 +792,39 @@ class HyperX_patches(torch.utils.data.Dataset):
             return data, label
 
         """
+        If the dataset is labeled return data accoring with data augmentation
+        and the ground truth of that specific data.
+        """
+        if self.labeled == 'Val':
+            p, x, y = self.idx_shuffle[i]
+            x1, y1 = x - self.patch_size // 2, y - self.patch_size // 2
+            x2, y2 = x1 + self.patch_size, y1 + self.patch_size
+
+            data = self.data[p, x1:x2, y1:y2]
+            label = self.label[p, x1:x2, y1:y2]
+
+            # Copy the data into numpy arrays (PyTorch doesn't like numpy views)
+            data = np.asarray(np.copy(data).transpose((2, 0, 1)), dtype='float32')
+            label = np.asarray(np.copy(label), dtype='int64')
+
+            # Load the data into PyTorch tensors
+            data = torch.from_numpy(data)
+            label = torch.from_numpy(label)
+            # Extract the center label if needed
+            if self.center_pixel and self.patch_size > 1:
+                label = label[self.patch_size // 2, self.patch_size // 2]
+            # Remove unused dimensions when we work with invidual spectrums
+            elif self.patch_size == 1:
+                data = data[:, 0, 0]
+                label = label[0, 0]
+
+            # Add a fourth dimension for 3D CNN
+            if self.patch_size > 1:
+                # Make 4D data ((Batch x) Planes x Channels x Width x Height)
+                data = data.unsqueeze(0)
+            return data, label
+
+        """
         If the data is unlabeled, return one version of the data with weak
         data augmentation and one version of the same data with strong
         data augmentation.
@@ -828,6 +862,69 @@ class HyperX_patches(torch.utils.data.Dataset):
                 data_strong = self.moving_average(data_strong, self.M)
 
             data_strong = self.cutout_spatial(data_strong)
+
+            # Copy the data into numpy arrays (PyTorch doesn't like numpy views)
+            data_weak = np.asarray(np.copy(data_weak).transpose((2, 0, 1)), dtype='float32')
+
+            data_strong = np.asarray(np.copy(data_strong).transpose((2, 0, 1)), dtype='float32')
+
+            # Load the data into PyTorch tensors
+            data_weak = torch.from_numpy(data_weak)
+            data_strong = torch.from_numpy(data_strong)
+
+            if self.patch_size == 1:
+                data_weak = data_weak[:, 0, 0]
+                data_strong = data_strong[:, 0, 0]
+
+            # Add a fourth dimension for 3D CNN
+            if self.patch_size > 1:
+                # Make 4D data ((Batch x) Planes x Channels x Width x Height)
+                data_weak = data_weak.unsqueeze(0)
+                data_strong = data_strong.unsqueeze(0)
+            return data_weak, data_strong
+
+        """
+        Version of fetching a sample when using Mean Teacher Model
+        """
+        if self.labeled == 'Mean':
+            p, x, y = self.idx_shuffle[i]
+            x1, y1 = x - self.patch_size // 2, y - self.patch_size // 2
+            x2, y2 = x1 + self.patch_size, y1 + self.patch_size
+
+            data_weak = self.data[p, x1:x2, y1:y2]
+            data_strong = np.copy(data_weak)
+            #print(data_strong.shape)
+            #This will currently not work with data that has no labels, it doesnt harm it right now either though...
+            # i.e. it is a zero matrix
+            #label_weak = self.label[p, x1:x2, y1:y2]
+            #label_strong = np.copy(label_weak)
+
+            if self.flip_augmentation and self.patch_size > 1:
+                # Perform data augmentation (only on 2D patches)
+                #data_weak, label_weak = self.flip(data_weak, label_weak)
+                #data_strong, label_strong = self.flip(data_strong, label_strong)
+                data_weak = self.flip(data_weak)
+                data_strong = self.flip(data_strong)
+            if np.random.rand() < 0.5:
+                data_strong = self.radiation_noise(data_strong)
+                data_weak = self.radiation_noise(data_weak)
+            #if np.random.rand() < 0.7:
+                #data_strong = self.mixture_noise(data_strong, label_strong)
+            if np.random.rand() < 0.5:
+                data_strong = self.pca_augmentation(data_strong, M=self.pca_strength)
+                data_weak = self.pca_augmentation(data_weak, M=self.pca_strength)
+            if np.random.random() < 0.5 and self.patch_size > 1:
+                data_strong = self.spatial_combinations(data_strong, self.M)
+                data_weak = self.spatial_combinations(data_weak, self.M)
+            if np.random.random() < 0.5:
+                data_strong = self.spectral_mean(data_strong, self.M)
+                data_weak = self.spectral_mean(data_weak, self.M)
+            if np.random.random() < 0.5:
+                data_strong = self.moving_average(data_strong, self.M)
+                data_weak = self.moving_average(data_weak, self.M)
+
+            data_strong = self.cutout_spatial(data_strong)
+            data_weak = self.cutout_spatial(data_weak)
 
             # Copy the data into numpy arrays (PyTorch doesn't like numpy views)
             data_weak = np.asarray(np.copy(data_weak).transpose((2, 0, 1)), dtype='float32')

@@ -17,71 +17,17 @@ def radiation_noise(data, alpha_range=(0.9, 1.1), beta=1/25):
     noise = np.random.normal(loc=0., scale=1.0, size=data.shape)
     return alpha * data + beta * noise
 
-""" It requires to be run in the dataset class as of now...
-#PCA augmentation technique. Adds noise in pca space and transform back
-def pca_augmentation(pca, data, label, M=1):
-    data_aug = np.zeros_like(data)
-    data_train = data - np.mean(self.data, axis=(0,1,2))
-    for idx, _ in np.ndenumerate(data[:,:,0]):
-        x,y = idx
-        alpha = M*np.random.uniform(0.9,1.1)
-        data_pca = pca.transform(data_train[x,y,:].reshape(1,-1))
-        data_pca[:,0] = data_pca[:,0]*alpha
-        data_aug[x,y,:] = pca.inverse_transform(data_pca)
-    return data_aug
-"""
-
-#Cutout augmentation, cut out a random part of the image and replace with ignored label
-#this is the vanilla implementation, might not work for this case because
-#of the middle pixel. The middle pixel should not be cut out since it is everything
-#[0 0 0 0 0]
-#[0 0 0 0 0]
-#[0 0 P 0 0]
-#[0 0 0 0 0]
-#[0 0 0 0 0]
-#fucked up augmentation purely made for 5x5 patches...
-def cutout_spatial(image):
-    cutout_image = image
-    y = np.random.choice([-1,0,1])
-    if y == 0:
-        x = np.random.choice([-1,1])
-        x_step = 2*x
-        x1 = np.min(x, x_step) + 2
-        x2 = np.max(x, x_step) + 2
-
-        y_step = np.random.choice([-1,1])
-        y1 = np.min(y, y_step) + 2
-        y2 = np.max(y, y_step) + 2
+def cutout_spatial(self, data):
+    cutout_image = np.copy(data)
+    x,y = data.shape[:2]
+    x_c, y_c = np.random.randint(x, size=2)
+    if x_c == x//2 and y_c == y//2:
+        return cutout_image
     else:
-        x = np.random.choice([-1,0,1])
-        if x == 0:
-            x_step = np.random.choice([-1,1])
-            x1 = np.min(x, x_step) + 2
-            x2 = np.max(x, x_step) + 2
-        else:
-            x_step = np.random.choice([-1,1])
-            x1 = np.min(x, x_step) + 2
-            x2 = np.max(x, x_step) + 2
-        y_step = 2*y
-        y1 = np.min(y, y_step) + 2
-        y2 = np.max(y, y_step) + 2
-    cutout_image[y1:y2,x1:x2,:] = 0
-    return cutout_image
-#Hyperspectral cutout method to cutout part of the spectral bands
-def cutout_spectral(image, M=1):
-    h, w, channels = image.shape
-    #See if magnitude works as factor
-    cutouts = 5*M
-    bands = 5*M
-    new_image = image
-    for _ in range(cutouts):
-        c = np.random.randint(c)
-        c1 = np.clip(c - bands // 2, 0, channels)
-        c2 = np.clip(c1 + bands, 0, channels)
-        new_image[:,:,c1:c2] = 0
-    return new_image
+        cutout_image[x_c, y_c, :] = 0
+        return cutout_image
 
-def spatial_combinations(data, M=1):
+def spatial_combinations(self, data, M=1):
     h, w, c = data.shape
     #Test to see if it is possible to use a magnitude as scaling fator for amount of samples to mix from
     size = 2*M
@@ -99,27 +45,64 @@ def spatial_combinations(data, M=1):
                 if np.sum(patch[p,:])==0:
                     delete_idx.append(p)
             patch = np.delete(patch, delete_idx, 0)
-        alphas = np.random.uniform(0.01, 1, size=patch.shape[0])
-        new_image[x,y,:] = np.dot(np.transpose(patch), alphas)/np.sum(alphas)
+            if patch.shape[0] == 0:
+                new_image[x,y,:] = 0
+            else:
+                alphas = np.random.uniform(0.01, 1, size=patch.shape[0])
+                new_image[x,y,:] = np.dot(np.transpose(patch), alphas)/np.sum(alphas)
     return new_image
+
+def spectral_mean(self, data, M=1):
+    new_data = np.copy(data)
+    bands = 4*M
+    channels = data.shape[-1]
+    chunks = channels/bands
+    for i in range(math.ceil(chunks)):
+        new_data[:,:,int(channels*i/chunks):int(channels*(i+1)/chunks)] = \
+        np.stack((np.mean(data[:,:,int(channels*i/chunks):int(channels*(i+1)/chunks)], axis=2) \
+        for _ in range(new_data[:,:,int(channels*i/chunks):int(channels*(i+1)/chunks)].shape[-1])), axis=2)
+    return new_data
+
+def moving_average(self, data, M=1):
+    new_data = np.copy(data)
+    channels = data.shape[-1]
+    bands = 2*M
+    for i in range(channels):
+        c1 = np.clip(i-bands, 0, channels)
+        c2 = np.clip(i+bands, 0, channels)
+        new_data[:,:,i] = np.mean(data[:,:,c1:c2], axis=2)
+    return new_data
 
 def identity(data):
     return data
 
-def posterize(data, M=1):
+def augment_pool_1():
+    augs = [(flip, None, None),
+            (radiation_noise, ),
+            (spatial_combinations, ),
+            (spectral_mean, ),
+            (moving_average, ),
+            (identity, None, None)]
 
-
-def augment_pool():
+def augment_pool_2():
+    augs = [(radiation_noise, ),
+            (spectral_mean, ),
+            (moving_average, ),
+            (identity, None, None)]
 
 class RandAugment(object):
 
-    def __init__(self, n, m):
+    def __init__(self, n, m, patch_size):
         assert n>=1
         assert 1 <= m <= 10
 
         self.n = n
         self.m = m
-        self.augment_pool = augment_pool()
+        self.patch_size = patch_size
+        if self.patch_size > 1:
+            self.augment_pool = augment_pool_1()
+        else:
+            self.augment_pool = augment_pool_2()
 
     def __call__(self, data):
         ops = random.choices(self.augment_pool, k=self.n)
@@ -127,5 +110,6 @@ class RandAugment(object):
             v = np.random.randint(1, self.m)
             if random.random() < 0.5:
                 data = op(data, v=v, max_v=max_v, bias=bias)
-        #data = cutout_spatial(data)
+        if self.patch_size > 1:
+            data = cutout_spatial(data)
         return data

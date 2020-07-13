@@ -1,12 +1,10 @@
-from qns3vm import QN_S3VM
 import scipy
 import numpy as np
 import os
 import random
+import sklearn.svm as SVM
 
 
-import warnings
-warnings.filterwarnings("ignore", category=PendingDeprecationWarning) 
 
 dataset_path = '/home/oscar/Desktop/Exjobb/Data/ieee_supplement/Hyperspectral_Grids/Salinas/'
 
@@ -62,73 +60,94 @@ def main():
         idx_rest = Y != i
         X_train = np.concatenate((X[idx_class], X[idx_rest]))
         Y_train = np.concatenate((np.ones(len(X[idx_class])).astype(int), -np.ones(len(X[idx_rest])).astype(int)))
-        CLF.append(QN_S3VM(X_train.tolist(), Y_train.tolist(), X_un.tolist(), rand_generator, lam=C_labeled, lamU=C_unlabeled[0], kernel_type='RBF'))
-        CLF[i].train()
+        # Classifier is a transductive SVM
+        #CLF.append(QN_S3VM(X_train.tolist(), Y_train.tolist(), X_un.tolist(), rand_generator, lam=C_labeled, lamU=C_unlabeled[0], kernel_type='RBF'))
+        #CLF[i].train()
 
-        for x in X_train:
-            value = CLF[i].predictValue(x.tolist())
-            if value == 1.0:
-                Np += 1
-            if value == -1.0:
-                Nm += 1
-        A[i] = np.min(Np,Nm)
+        # Classifier is a standard SVM
+        CLF.append(SVM.SVC(kernel='rbf', gamma=0.5, C=C_labeled)) #C=1000 other option
+        CLF[i].fit(X_train,Y_train)
 
-    for i in range(G):
+        support = CLF[i].n_support_
+
+        Np = support[1]
+        Nm = support[0]
+
+        A[i] = np.min((Np,Nm))
+
+    for g in range(G):
         for i in range(n_classes):
             #Find A transductive samples
-            values = []
-            for x in X_un:
-                values.append(CLF[i].predictValue(x))
+            values = CLF[i].decision_function(X_un)
             values = np.asarray(values)
-            values_p = np.abs(1 - values[values>0])
-            values_m = np.abs(-1 - values[values<0])
 
-            idx_p = np.zeros(A)
-            idx_m = np.zeros(A)
+            if np.max(values)>0 and np.min(values)<0:
+                #Extract values of positive unlabeled samples
+                values_p = np.abs(1 - values[values>0])
+                idx_p = values_p.argsort()[:int(A[i])]
+                #Threshold
+                D_p = np.sum(values[idx_p])/A[i]
+                Th_p = D_p*np.max(np.abs(values[idx_p]))
+                #Trim candidate set
+                N_p = len(values[idx_p][np.abs(values[idx_p])>=Th_p])
 
-            for i in range(A):
-                idx_p[i] = np.argmin(values_p)
-                idx_m[i] = np.argmin(values_m)
-                values_p[idx_p[i]] = 100000
-                values_m[idx_m[i]] = 100000
 
-            #Threshold
-            D_p = np.sum(values[idx_p])/A
-            D_m = np.sum(values[idx_m])/A
+                values_m = np.abs(-1 - values[values<0])
+                idx_m = values_m.argsort()[:int(A[i])]
+                #Threshold
+                D_m = np.sum(values[idx_m])/A[i]
+                Th_m = D_m*np.max(np.abs(values[idx_m]))
+                #Trim candidate set
+                N_m = len(values[idx_m][np.abs(values[idx_m])>=Th_m])
 
-            Th_p = D_p*np.max(np.abs(values[idx_p]))
-            Th_m = D_m*np.max(np.abs(values[idx_m]))
+                N = np.min((N_p, N_m))
 
-            #Trim candidate set
-            N_p = len(values[idx_p][np.abs(values[idx_p])>=Th_p])
-            N_m = len(values[idx_m][np.abs(values[idx_m])>=Th_m])
-            N = np.min(N_p, N_m)
+                if N == N_p:
+                    X_un_p = X_un[idx_p]
+                    X_un_m = X_un[idx_m[:N]]
+                    del_idx = np.concatenate((idx_p, idx_m[:N]))
+                elif N==N_m:
+                    X_un_m = X_un[idx_m]
+                    X_un_p = X_un[idx_p[:N]]
+                    del_idx = np.concatenate((idx_m, idx_p[:N]))
 
-            if N == N_p:
-                X_un_p = X_un[idx_p]
-                X_un_m = X_un[idx_m][values_m.argsort()[-N:][::-1]]
-                del_idx = np.concatenate((idx_p, idx_m[[values_m.argsort()[-N:][::-1]]]))
-            elif N==N_m:
-                X_un_m = X_un[idx_m]
-                X_un_p = X_un[idx_p][values_p.argsort()[-N:][::-1]]
-                del_idx = np.concatenate((idx_m, idx_p[[values_p.argsort()[-N:][::-1]]]))
+                #Update datasets
+                idx_class = Y == i
+                idx_rest = Y != i
+                X_train = np.concatenate((X[idx_class], X[idx_rest]))
+                Y_train = np.concatenate((np.ones(len(X[idx_class])), -np.ones(len(X[idx_rest]))))
 
-            #Update datasets
-            idx_class = Y == i
-            idx_rest = Y != i
-            X_train = np.stack(X[idx_class], X[idx_rest])
-            Y_train = np.stack(np.ones(len(X[idx_class])), -np.ones(len(X[idx_rest])))
+                np.append(X_train, (X_un_m, X_un_p))
+                np.append(Y_train, (-np.ones(len(X_un_m)), np.ones(len(X_un_p))))
+                X_un = np.delete(X_un, del_idx,0)
 
-            X_train.append(X_un_m, X_un_p)
-            Y_train.append(-np.ones(len(X_un_m)), np.ones(len(X_un_p)))
-            np.delete(X_un, del_idx)
+                #Update weight factor
+                #C[i] = (C_max - C[0])/G^2*g^2 + C[0]
 
-            #Update weight factor
-            C[i] = (C_max - C[0])/G^2*i^2 + C[0]
+                #Retrain the TSVM
+                CLF[i].fit(X_train, Y_train)
 
-            #Retrain the TSVM
-            CLF[i] = QN_S3VM(X_train, Y_train, X_un, lam=C_labeled, lamU=C[i], kernel_type='RBF')
+    pred_values = []
+    for i in range(n_classes):
+        pred_values.append(CLF[i].decision_function(test_img.reshape(-1, n_bands)))
+    predicted_values = np.asarray(pred_values)
+    prediction = np.argmax(predicted_values, axis=0)
+    prediction = prediction.reshape(test_img.shape[:2])
 
+    run_results = utils.metrics(prediction, test_gt, ignored_labels=ignored_labels, n_classes=n_classes)
+
+    mask = np.zeros(test_gt.shape, dtype='bool')
+    for l in ignored_labels:
+        mask[test_gt == l] = True
+    prediction += 1
+    prediction[mask] = 0
+
+    color_prediction = convert_to_color(prediction)
+    utils.display_predictions(color_prediction, vis, gt=convert_to_color(test_gt), caption="Prediction vs. test ground truth")
+
+    utils.show_results(run_results, vis, label_values=label_values)
+
+    return run_results
 
 def convert_to_color_(arr_2d, palette=None):
     """Convert an array of labels to RGB color-encoded image.

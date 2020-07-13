@@ -12,6 +12,7 @@ from torch.optim.lr_scheduler import LambdaLR
 import torch.optim as optim
 from torch.nn import init
 import torch.utils.data as data
+from torch.autograd import Variable
 #from torchsummary import summary
 #from torch.utils.tensorboard  import SummaryWriter
 from tensorboardX import SummaryWriter
@@ -25,7 +26,7 @@ from tqdm import tqdm
 import argparse
 
 def main(raw_args=None):
-    parser = argparse.ArgumentParser(description="Hyperspectral image classification with FixMatch")
+    parser = argparse.ArgumentParser(description="Hyperspectral image classification with Teacher-Student")
     parser.add_argument('--patch_size', type=int, default=5,
                         help='Size of patch around each pixel taken for classification')
     parser.add_argument('--center_pixel', action='store_false',
@@ -40,8 +41,13 @@ def main(raw_args=None):
                         help='what CUDA device to run on, -1 defaults to cpu')
     parser.add_argument('--warmup', type=float, default=0,
                         help='warmup epochs')
-    parser.add_argument('--threshold', type=float, default=0.95,
-                        help='confidence threshold for pseudo labels')
+    parser.add_argument('--consistency', type=float, default=100.0,
+                        help='Consistency weight maximum value. Defaults to 100.')
+    parser.add_argument('--consistency_rampup', type=int, default=5,
+                        help='epochs of rampup for consistency? Defaults to 5.')
+    parser.add_argument('--ema_decay', type=float, default=0.95,
+                        help='EMA decay of weights. Defaults to 0.95.')
+
     parser.add_argument('--save', action='store_true',
                         help='use to save model weights when running')
     parser.add_argument('--test_stride', type=int, default=1,
@@ -60,6 +66,7 @@ def main(raw_args=None):
                         help='use to load model weights from a certain directory')
     parser.add_argument('--model', type=str, default='3D',
                         help='Choose model. Possible is 3D or 1D. Defaults to 3D.')
+
     #Augmentation arguments
     parser.add_argument('--flip_augmentation', action='store_true',
                         help='use to flip augmentation data for use')
@@ -191,11 +198,19 @@ def main(raw_args=None):
         utils.display_predictions(convert_to_color(test_gt), vis, writer=writer,
                                     caption="Test ground truth")
 
+    # Create two models, one regular and one running EMA (this will be student and teacher resp.)
     if args.model == '3D':
         model = HamidaEtAl(args.n_bands, args.n_classes,
                            patch_size=args.patch_size)
+        ema_model = HamidaEtAl(args.n_bands, args.n_classes,
+                           patch_size=args.patch_size)
+        for param in ema_model.parameters():
+            param.detach_()
     if args.model == '1D':
         model = NalepaEtAl(args.n_bands, args.n_classes)
+        ema_model = NalepaEtAl(args.n_bands, args.n_classes)
+        for param in ema_model.parameters():
+            param.detach_()
 
     optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=0.9,
                           nesterov=True, weight_decay=0.0005)
@@ -234,19 +249,19 @@ def main(raw_args=None):
 
         train_labeled_dataset = HyperX_patches(train_img, train_gt, idx_sup, labeled=True, **vars(args))
         train_labeled_loader = data.DataLoader(train_labeled_dataset, batch_size=args.batch_size,
-                                       pin_memory=True, num_workers=10,
+                                       pin_memory=True, num_workers=5,
                                        shuffle=True, drop_last=True)
 
         #unlabeled_ratio = math.ceil(len(idx_unsup)/len(idx_sup))
         unlabeled_ratio = args.unlabeled_ratio
 
-        train_unlabeled_dataset = HyperX_patches(train_img, train_gt, idx_unsup, labeled=False, **vars(args))
+        train_unlabeled_dataset = HyperX_patches(train_img, train_gt, idx_unsup, labeled='Mean', **vars(args))
         if args.dataset == 'Pavia' and args.extra_data == 'True':
             train_unlabeled_dataset = data.ConcatDataset([train_unlabeled_dataset,
-                                                          HyperX_patches(img_1, gt_1, idx_1, labeled=False, **vars(args)),
-                                                          HyperX_patches(img_2, gt_2, idx_2, labeled=False, **vars(args))])
+                                                          HyperX_patches(img_1, gt_1, idx_1, labeled='Mean', **vars(args)),
+                                                          HyperX_patches(img_2, gt_2, idx_2, labeled='Mean', **vars(args))])
         train_unlabeled_loader = data.DataLoader(train_unlabeled_dataset, batch_size=args.batch_size*unlabeled_ratio,
-                                       pin_memory=True, num_workers=10,
+                                       pin_memory=True, num_workers=5,
                                        shuffle=True, drop_last=True)
 
         amount_labeled = idx_sup.shape[0]
@@ -272,7 +287,7 @@ def main(raw_args=None):
                                                 pin_memory=True, num_workers=5,
                                                 shuffle=True, drop_last=True)
 
-        train_unlabeled_dataset = HyperX(img, train_unlabeled_gt, labeled=False, **vars(args))
+        train_unlabeled_dataset = HyperX(img, train_unlabeled_gt, labeled='Mean', **vars(args))
         train_unlabeled_loader = data.DataLoader(train_unlabeled_dataset,
                                                     batch_size=args.batch_size*args.unlabeled_ratio,
                                                     pin_memory=True, num_workers=5,
@@ -306,8 +321,8 @@ def main(raw_args=None):
         args.weights = weights
 
     args.weights = args.weights.to(args.device)
-    loss_labeled = nn.CrossEntropyLoss(weight=args.weights)
-    loss_unlabeled = nn.CrossEntropyLoss(weight=args.weights, reduction='none')
+    class_loss = nn.CrossEntropyLoss(weight=args.weights, size_average=False)
+    consistency_loss = softmax_mse_loss
     loss_val = nn.CrossEntropyLoss(weight=args.weights)
 
     print(args)
@@ -323,10 +338,12 @@ def main(raw_args=None):
 
     if args.load_file is not None:
         model.load_state_dict(torch.load(args.load_file))
+        ema_model.load_state_dict(torch.load(args.load_file))
     model.zero_grad()
+    ema_model.zero_grad()
 
     try:
-        train(model, optimizer, loss_labeled, loss_unlabeled, loss_val, train_labeled_loader,
+        train(model, ema_model, optimizer, class_loss, consistency_loss, loss_val, train_labeled_loader,
               train_unlabeled_loader, writer, args, val_loader=val_loader, display=vis)
     except KeyboardInterrupt:
         # Allow the user to stop the training
@@ -359,8 +376,8 @@ def main(raw_args=None):
 
     return run_results
 
-def train(net, optimizer, criterion_labeled, criterion_unlabeled, criterion_val, labeled_data_loader,
-          unlabeled_data_loader, writer, args,
+def train(model, ema_model, optimizer, criterion_labeled, criterion_consistency,
+          criterion_val, labeled_data_loader, unlabeled_data_loader, writer, args,
           display_iter=10, display=None, val_loader=None):
     """
     Training loop to optimize a network for several epochs and a specified loss
@@ -387,10 +404,11 @@ def train(net, optimizer, criterion_labeled, criterion_unlabeled, criterion_val,
     save_dir = args.save_dir
 
 
-    if criterion_labeled is None or criterion_unlabeled is None:
+    if criterion_labeled is None or criterion_consistency is None:
         raise Exception("Missing criterion. You must specify a loss function.")
 
-    net.to(args.device)
+    model.to(args.device)
+    ema_model.to(args.device)
 
     save_epoch = args.epochs // 20 if args.epochs > 20 else 1
 
@@ -403,7 +421,8 @@ def train(net, optimizer, criterion_labeled, criterion_unlabeled, criterion_val,
 
     for e in tqdm(range(1, args.epochs + 1), desc="Training the network"):
         # Set the network to training mode
-        net.train()
+        model.train()
+        ema_model.train()
         avg_loss = 0.
 
         losses_meter = AverageMeter()
@@ -418,32 +437,30 @@ def train(net, optimizer, criterion_labeled, criterion_unlabeled, criterion_val,
             #Try to remove prediction for ignored class
             targets_x = targets_x - 1
 
-            inputs_u_w, inputs_u_s = data_u
+            inputs_model, inputs_ema = data_u
 
             batch_size = inputs_x.shape[0]
             # Load the data into the GPU if required
-            inputs = torch.cat((inputs_x, inputs_u_w, inputs_u_s)).to(args.device)
+            inputs_x = inputs_x.to(args.device)
+            inputs_model = inputs_model.to(args.device)
+            inputs_ema = inputs_ema.to(args.device)
             targets_x = targets_x.to(args.device)
-            logits = net(inputs)
-            logits_x = logits[:args.batch_size]
-            logits_u_w, logits_u_s = logits[args.batch_size:].chunk(2)
-            del logits
 
-            Lx = criterion_labeled(logits_x, targets_x)
+            logits_x = model(inputs_x)
+            logits_model = model(inputs_model)
 
-            pseudo_label = torch.softmax(logits_u_w.detach_(), dim=-1)
-            max_probs, targets_u = torch.max(pseudo_label, dim=-1)
-            #To see that we don't predict any ignored labels
-            #ignored_index = np.nonzero(targets_u==args.ignored_labels)
-            mask = max_probs.ge(args.threshold).float()
-            #mask[ignored_index] = 0
+            logits_ema = ema_model(inputs_ema)
+            logits_ema = Variable(logits_ema.detach().data, requires_grad=False)
 
-            Lu = (criterion_unlabeled(logits_u_s, targets_u) * mask).mean()
+            Lx = criterion_labeled(logits_x, targets_x)/args.batch_size
+
+            consistency_weight = get_consistency_weight(e, args)
+            Lc = consistency_weight*criterion_consistency(logits_model, logits_ema)/args.batch_size
 
             if e < args.pretrain:
                 loss = Lx
             else:
-                loss = Lx + 1 * Lu
+                loss = Lx + Lc
 
 
             optimizer.zero_grad()
@@ -452,20 +469,21 @@ def train(net, optimizer, criterion_labeled, criterion_unlabeled, criterion_val,
             optimizer.step()
             args.scheduler.step()
 
+            update_ema_variables(model, ema_model, args.ema_decay, iter_)
+
             losses_meter.update(loss.item())
             losses_x.update(Lx.item())
-            losses_u.update(Lu.item())
-            mask_prob = mask.mean().item()
+            losses_u.update(Lc.item())
 
             avg_loss += loss.item()
             losses[iter_] = loss.item()
             mean_losses[iter_] = np.mean(losses[max(0, iter_ - 100):iter_ + 1])
 
             if display_iter and iter_ % display_iter == 0:
-                string = 'Train (epoch {}/{}) [Iter: {:4}/{:4}]\tLr: {:.6f}\tLoss: {:.4f}\tLoss_labeled: {:.4f}\tLoss_unlabeled: {:.4f}\tMask: {:.4f}'
+                string = 'Train (epoch {}/{}) [Iter: {:4}/{:4}]\tLr: {:.6f}\tLoss: {:.4f}\tLoss_labeled: {:.4f}\tLoss_unlabeled: {:.4f}\t'
                 string = string.format(e, args.epochs, batch_idx + 1,
-                                       args.iterations, args.scheduler.get_last_lr()[0],
-                                       losses_meter.avg, losses_x.avg, losses_u.avg, mask_prob)
+                                       args.iterations, args.scheduler.get_lr()[0],
+                                       losses_meter.avg, losses_x.avg, losses_u.avg)
                 update = None if loss_win is None else 'append'
                 if display is not None:
                     loss_win = display.line(
@@ -493,13 +511,13 @@ def train(net, optimizer, criterion_labeled, criterion_unlabeled, criterion_val,
                                                  'ylabel': "Accuracy"
                                                 })
             iter_ += 1
-            del(data_x, data_u, loss, inputs_u_s, inputs_u_w, inputs_x, targets_x,
-                logits_x, logits_u_s, logits_u_w, Lx, Lu)
+            del(data_x, data_u, loss, inputs_model, inputs_ema, inputs_x, targets_x,
+                logits_x, logits_model, logits_ema, Lx, Lc)
 
         # Update the scheduler
         avg_loss /= len(labeled_data_loader)
         if val_loader is not None:
-            val_acc, val_loss = val(net, val_loader, criterion_val, device=args.device, supervision='full')
+            val_acc, val_loss = val(ema_model, val_loader, criterion_val, device=args.device, supervision='full')
             #val_accuracies.append(val_acc)
             #metric = -val_acc
         else:
@@ -508,13 +526,12 @@ def train(net, optimizer, criterion_labeled, criterion_unlabeled, criterion_val,
         writer.add_scalar('train/1.train_loss', losses_meter.avg, e)
         writer.add_scalar('train/2.train_loss_x', losses_x.avg, e)
         writer.add_scalar('train/3.train_loss_u', losses_u.avg, e)
-        writer.add_scalar('train/4.mask', mask_prob, e)
         writer.add_scalar('test/1.test_acc', val_acc.avg, e)
         writer.add_scalar('test/2.test_loss', val_loss.avg, e)
 
         # Save the weights
         if e % save_epoch == 0 and args.save == True:
-            save_model(net, utils.camel_to_snake(str(net.__class__.__name__)),
+            save_model(ema_model, utils.camel_to_snake(str(net.__class__.__name__)),
                        labeled_data_loader.dataset.name, args.save_dir, epoch=args.epochs, metric=abs(-val_acc.avg))
 
 
@@ -619,6 +636,37 @@ def test(net, img, args):
                     probs[x:x + w, y:y + h] += out
     return probs
 
+def softmax_mse_loss(input_logits, target_logits):
+    """Takes softmax on both sides and returns MSE loss
+    Note:
+    - Returns the sum over all examples. Divide by the batch size afterwards
+      if you want the mean.
+    - Sends gradients to inputs but not the targets.
+    """
+    assert input_logits.size() == target_logits.size()
+    input_softmax = F.softmax(input_logits, dim=1)
+    target_softmax = F.softmax(target_logits, dim=1)
+    num_classes = input_logits.size()[1]
+    return F.mse_loss(input_softmax, target_softmax, size_average=False) / num_classes
+
+def sigmoid_rampup(current, rampup_length):
+    """Exponential rampup from https://arxiv.org/abs/1610.02242"""
+    if rampup_length == 0:
+        return 1.0
+    else:
+        current = np.clip(current, 0.0, rampup_length)
+        phase = 1.0 - current / rampup_length
+        return float(np.exp(-5.0 * phase * phase))
+
+def get_consistency_weight(epoch, args):
+    # Consistency ramp-up from https://arxiv.org/abs/1610.02242
+    return args.consistency * sigmoid_rampup(epoch, args.consistency_rampup)
+
+def update_ema_variables(model, ema_model, alpha, global_step):
+    # Use the true average until the exponential average is more correct
+    alpha = min(1 - 1 / (global_step + 1), alpha)
+    for ema_param, param in zip(ema_model.parameters(), model.parameters()):
+        ema_param.data.mul_(alpha).add_(1 - alpha, param.data)
 
 class HamidaEtAl(nn.Module):
     """

@@ -186,7 +186,7 @@ def main(raw_args=None):
         writer.add_text('Labeled samples per class', str(samples_class))
         print('Labeled samples per class: ' + str(samples_class))
 
-        val_dataset = HyperX_patches(train_img, train_gt, idx_val, labeled=True, **vars(args))
+        val_dataset = HyperX_patches(train_img, train_gt, idx_val, labeled='Val', **vars(args))
         val_loader = data.DataLoader(val_dataset, batch_size=args.batch_size)
 
         train_dataset = HyperX_patches(train_img, train_gt, idx_sup, labeled=True, **vars(args))
@@ -198,7 +198,7 @@ def main(raw_args=None):
     else:
         train_labeled_gt, val_gt = utils.sample_gt(train_gt, 0.95, mode=args.sampling_mode)
 
-        val_dataset = HyperX(img, val_gt, labeled=True, **vars(args))
+        val_dataset = HyperX(img, val_gt, labeled='Val', **vars(args))
         val_loader = data.DataLoader(val_dataset,
                                     batch_size=args.batch_size)
 

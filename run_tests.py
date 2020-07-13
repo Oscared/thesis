@@ -130,18 +130,20 @@ def main(raw_args=None):
     writer.close()
 
 if __name__ == '__main__':
-    samples = ['20', '40', '80', '140', '200']
+    ratio = ['2', '4', '8', '16']
     extra_data = ['True', 'False']
     dataset = ['Pavia', 'Salinas']
-    for s in samples:
+    for r in ratio:
         for d in dataset:
             if d == 'Pavia':
                 for e in extra_data:
                     main(['--server', '--sampling_fixed', 'True', '--method', 'fixmatch', '--runs', str(2),
-                          '--epochs', str(60), '--dataset', d, '--extra_data', e, '--samples', s])
+                          '--epochs', str(60), '--dataset', d, '--extra_data', e, '--samples', str(40),
+                          '--unlabeled_ratio', r])
             else:
-                main(['--server', '--sampling_fixed', 'True', '--method', 'fixmatch', '--runs', str(2),
-                      '--epochs', str(60), '--dataset', d, '--samples', s])
+                main(['--server', '--sampling_fixed', 'True', '--method', 'fixmatch', '--runs', str(40),
+                      '--epochs', str(60), '--dataset', d, '--samples', str(),
+                      '--unlabeled_ratio', r])
     """
     aug = ['spatial_combinations', 'moving_average', 'spectral_mean']
     M = [10, 12, 15, 20]
