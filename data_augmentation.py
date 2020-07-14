@@ -73,6 +73,34 @@ def moving_average(self, data, M=1):
         new_data[:,:,i] = np.mean(data[:,:,c1:c2], axis=2)
     return new_data
 
+def spectral_shift(self, data, M=1):
+    new_data=np.roll(data, M*2, axis=-1)
+    return new_data
+
+def band_combination(self, data, M=1):
+    h, w, c = data.shape
+    #Test to see if it is possible to use a magnitude as scaling fator for amount of samples to mix from
+    size = 2*M
+    new_image = np.zeros_like(data)
+    for x in range(h):
+        for y in range(w):
+            x1 = np.clip(x - size // 2, 0, h)
+            x2 = np.clip(x + size // 2 + 1, 0, h)
+            y1 = np.clip(y - size // 2, 0, w)
+            y2 = np.clip(y + size // 2 + 1,  0, w)
+            patch = data[x1:x2, y1:y2, :]
+            patch = patch.reshape(np.prod(patch.shape[:2]), c)
+            delete_idx = []
+            for p in range(patch.shape[0]):
+                if np.sum(patch[p,:])==0:
+                    delete_idx.append(p)
+            patch = np.delete(patch, delete_idx, 0)
+            if patch.shape[0] == 0:
+                new_image[x,y,:] = 0
+            else:
+                new_image[x,y,:] = 0
+        return new_image
+
 def identity(data):
     return data
 

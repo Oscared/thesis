@@ -760,8 +760,6 @@ class HyperX_patches(torch.utils.data.Dataset):
                 data = self.pca_augmentation(data, M=self.pca_strength)
             if self.spatial_cutout_aug and np.random.random() < 0.5:
                 data = self.cutout_spatial(data)
-            if self.spectral_cutout_aug and np.random.random() < 0.5:
-                data = self.cutout_spectral(data, self.M)
             if self.spatial_comb and np.random.random() < 0.5:
                 data = self.spatial_combinations(data, self.M)
             if self.mean_spectral and np.random.random() < 0.5:

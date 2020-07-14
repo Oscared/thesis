@@ -3,17 +3,53 @@ import numpy as np
 import os
 import random
 import sklearn.svm as SVM
+import argparse
+import visdom
 
-
+from datasets import get_dataset
 
 dataset_path = '/home/oscar/Desktop/Exjobb/Data/ieee_supplement/Hyperspectral_Grids/Salinas/'
 
-def main():
-    data_path = '/home/oscar/Desktop/Exjobb/Data/ieee_supplement/Hyperspectral_Grids/Salinas/'
+def main(raw_args=None):
+    parser = argparse.ArgumentParser(description='Transductive SVM implementation.')
+    parser.add_argument('--dataset', type=str, default='Salinas',
+                        help='Name of dataset to run. Salinas, Pavia or Indian, defaults to Salinas')
+    parser.add_argument('--fold', type=int, default=0,
+                        help='Which fold to sample from if using Nalepas validation scheme')
+    parser.add_argument('--use_vis', action='store_true',
+                        help='use to enable Visdom for visualization, remember to start the Visdom server')
+    parser.add_argument('--samples_per_class', type=int, default=10,
+                        help='Amount of samples to sample for each class when sampling a fixed amount. Defaults to 10.')
+    parser.add_argument('--sampling_fixed', type=str, default='False',
+                        help='Use to sample a fixed amount of samples for each class from Nalepa sampling')
+    parser.add_argument('--extra_data', type=str, default='True',
+                        help='add extra data for pavia dataset. Defaults to true.')
 
-    fold = 0
+    args = parser.parse_args(raw_args)
 
-    train_img, train_gt, test_img, test_gt, label_values, ignored_labels, rgb_bands, palette = get_patch_data('Salinas', 1, target_folder=data_path, fold=fold)
+    if args.use_vis == True:
+        vis = visdom.Visdom()
+    else:
+        vis = None
+
+    data_path = '/home/oscar/Desktop/Exjobb/Data/ieee_supplement/Hyperspectral_Grids/{}'
+
+    if args.dataset == 'Salinas':
+        data_folder = 'Salinas'
+    elif args.dataset == 'Pavia':
+        data_folder = 'Pavia University'
+    elif args.dataset == 'Indian':
+        data_folder = 'Indian Pines'
+    else:
+        print('No dataset by right name')
+
+    train_img, train_gt, test_img, test_gt, label_values, ignored_labels, rgb_bands, palette = get_patch_data(args.dataset, 1, target_folder=data_path.format(data_folder), fold=args.fold)
+    if args.dataset == 'Pavia' and args.extra_data == 'True':
+        train_img, train_gt, test_img, test_gt, label_values, ignored_labels, rgb_bands, palette = get_patch_data('pavia', 1, target_folder=data_path.format(data_folder), fold=args.fold)
+        args.n_bands = train_img.shape[-1]
+        img_unlabeled, _, _, _, _, _ = get_dataset('PaviaC', target_folder='/home/oscar/Desktop/Exjobb/Data/')
+
+        img_unlabeled = np.concatenate((img_unlabeled, img_unlabeled[:,:,-1, np.newaxis]), axis=-1)
 
     def convert_to_color(x):
         return convert_to_color_(x, palette=palette)
@@ -25,6 +61,20 @@ def main():
 
     idx_sup, idx_val, idx_unsup = get_pixel_idx(train_img, train_gt, ignored_labels, 5)
 
+    if args.sampling_fixed == 'True':
+        unique_labels = np.zeros(len(label_values))
+        new_idx_sup = []
+        index = 0
+        for p,x,y in idx_sup:
+            label = train_gt[p,x,y]
+            if unique_labels[label] < args.samples_per_class:
+                unique_labels[label] += 1
+                new_idx_sup.append([p,x,y])
+                np.delete(idx_sup, index)
+            index += 1
+        idx_unsup = np.concatenate((idx_sup, idx_unsup))
+        idx_sup = np.asarray(new_idx_sup)
+
     i = 0
     X = np.zeros((len(idx_sup), n_bands))
     Y = np.zeros(len(idx_sup))
@@ -34,10 +84,20 @@ def main():
         i += 1
 
     i = 0
-    X_un = np.zeros((len(idx_unsup), n_bands))
+    if args.dataset == 'Pavia' and args.extra_data == 'True':
+        X_un = np.zeros((len(idx_unsup) + img_unlabeled.shape[0]*img_unlabeled.shape[1], n_bands))
+    else:
+        X_un = np.zeros((len(idx_unsup), n_bands))
     for p, x, y in idx_unsup:
         X_un[i, :] = train_img[p,x,y]
         i += 1
+    if args.dataset == 'Pavia' and args.extra_data == 'True':
+        for x in range(img_unlabeled.shape[0]):
+            for y in range(img_unlabeled.shape[1]):
+                X_un[i,:] = img_unlabeled[x,y,:]
+                i += 1
+
+    print('Starting TSVM...')
 
     G = 10
 
@@ -55,6 +115,8 @@ def main():
 
     CLF = []
 
+    no_go = []
+
     for i in range(n_classes):
         idx_class = Y == i
         idx_rest = Y != i
@@ -66,6 +128,9 @@ def main():
 
         # Classifier is a standard SVM
         CLF.append(SVM.SVC(kernel='rbf', gamma=0.5, C=C_labeled)) #C=1000 other option
+        if np.max(idx_class) == 0:
+            no_go.append(i)
+            break
         CLF[i].fit(X_train,Y_train)
 
         support = CLF[i].n_support_
@@ -75,8 +140,13 @@ def main():
 
         A[i] = np.min((Np,Nm))
 
-    for g in range(G):
-        for i in range(n_classes):
+    print('No go classes: ' + str(no_go))
+    yes_go = np.delete(range(n_classes), no_go)
+
+    for i in yes_go:
+        X_un_run = X_un
+        for g in range(G):
+            print('Running class: ' + str(i) + '. Time: ' + str(g))
             #Find A transductive samples
             values = CLF[i].decision_function(X_un)
             values = np.asarray(values)
@@ -103,12 +173,12 @@ def main():
                 N = np.min((N_p, N_m))
 
                 if N == N_p:
-                    X_un_p = X_un[idx_p]
-                    X_un_m = X_un[idx_m[:N]]
+                    X_un_p = X_un_run[idx_p]
+                    X_un_m = X_un_run[idx_m[:N]]
                     del_idx = np.concatenate((idx_p, idx_m[:N]))
                 elif N==N_m:
-                    X_un_m = X_un[idx_m]
-                    X_un_p = X_un[idx_p[:N]]
+                    X_un_m = X_un_run[idx_m]
+                    X_un_p = X_un_run[idx_p[:N]]
                     del_idx = np.concatenate((idx_m, idx_p[:N]))
 
                 #Update datasets
@@ -119,7 +189,7 @@ def main():
 
                 np.append(X_train, (X_un_m, X_un_p))
                 np.append(Y_train, (-np.ones(len(X_un_m)), np.ones(len(X_un_p))))
-                X_un = np.delete(X_un, del_idx,0)
+                X_un_run = np.delete(X_un_run, del_idx,0)
 
                 #Update weight factor
                 #C[i] = (C_max - C[0])/G^2*g^2 + C[0]
@@ -127,9 +197,9 @@ def main():
                 #Retrain the TSVM
                 CLF[i].fit(X_train, Y_train)
 
-    pred_values = []
-    for i in range(n_classes):
-        pred_values.append(CLF[i].decision_function(test_img.reshape(-1, n_bands)))
+    pred_values = np.zeros((n_classes, test_img.shape[0]*test_img.shape[1]))
+    for i in yes_go:
+        pred_values[i,:] = (CLF[i].decision_function(test_img.reshape(-1, n_bands)))
     predicted_values = np.asarray(pred_values)
     prediction = np.argmax(predicted_values, axis=0)
     prediction = prediction.reshape(test_img.shape[:2])
@@ -303,4 +373,24 @@ def get_pixel_idx(data, gt, ignored_labels, patch_size):
 
 
 if __name__ == '__main__':
-    main()
+    datasets = ['Pavia', 'Salinas', 'Indian']
+    runs = 2
+
+    for dataset in datasets:
+        if dataset == 'Indian':
+            folds = 4
+        else:
+            folds = 5
+
+        avg_acc = np.zeros(folds)
+
+        for f in range(0,folds):
+            for r in range(runs):
+                result = main(['--dataset', dataset, '--fold', f, '--use_vis'])
+                results.append(result)
+                avg_acc[f] += result['Accuracy']
+
+        avg_acc = avg_acc/args.runs
+        print('Ran all the folds for: ' + dataset)
+        print('Average accuracy per fold: ' + str(avg_acc))
+        print('Total average accuracy: ' + str(np.sum(avg_acc)/len(avg_acc)))

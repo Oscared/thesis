@@ -5,7 +5,7 @@ from supervised_hsi import main as supervised
 from mixup_hsi import main as mixup
 import numpy as np
 from tensorboardX import SummaryWriter
-
+import datetime
 
 def main(raw_args=None):
     parser = argparse.ArgumentParser(description='Main testing file for running several tests over several datasets')
@@ -74,7 +74,12 @@ def main(raw_args=None):
         print('No dataset by right name')
 
     avg_acc = np.zeros(folds)
-    writer = SummaryWriter('results/{}/overall/{}/'.format(args.run_name, args.augment))
+
+    tensorboard_dir = 'results/{}/overall/{}/'.format(args.run_name, datetime.datetime.now().strftime("%m-%d-%X"))
+
+    os.makedirs(tensorboard_dir, exist_ok=True)
+
+    writer = SummaryWriter(tensorboard_dir)
 
     writer.add_text('Arguments', str(args))
 
@@ -91,7 +96,7 @@ def main(raw_args=None):
                 elif args.augment == 'moving_average':
                     supervised_args = ['--augmentation_magnitude', str(args.M), '--moving_average', '--class_balancing', '--dataset', args.dataset, '--data_dir', data_path.format(data_folder), '--results', 'results/{}/{}/'.format(args.run_name, args.augment),'--epochs', '{}'.format(args.epochs), '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size), '--fold', '{}'.format(f), '--cuda', '0', '--sampling_fixed', args.sampling_fixed]
                 elif args.augment == 'pca':
-                    supervised_args = ['--augmentation_magnitude', str(args.M), '--pca_augmentation', '--class_balancing', '--dataset', args.dataset, '--data_dir', data_path.format(data_folder), '--results', 'results/{}/{}/'.format(args.run_name, args.augment),'--epochs', '{}'.format(args.epochs), '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size), '--fold', '{}'.format(f), '--cuda', '0', '--sampling_fixed', args.sampling_fixed]
+                    supervised_args = ['--pca_strength', str(args.M), '--pca_augmentation', '--class_balancing', '--dataset', args.dataset, '--data_dir', data_path.format(data_folder), '--results', 'results/{}/{}/'.format(args.run_name, args.augment),'--epochs', '{}'.format(args.epochs), '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size), '--fold', '{}'.format(f), '--cuda', '0', '--sampling_fixed', args.sampling_fixed]
                 result = supervised(supervised_args)
             elif args.method == 'mixup':
                 result = mixup(['--class_balancing', '--dataset', args.dataset,
@@ -132,6 +137,7 @@ def main(raw_args=None):
     writer.close()
 
 if __name__ == '__main__':
+    """
     ratio = ['2', '4', '8', '16']
     extra_data = ['True', 'False']
     dataset = ['Pavia', 'Salinas']
@@ -147,12 +153,12 @@ if __name__ == '__main__':
                       '--epochs', str(60), '--dataset', d, '--samples', str(40),
                       '--unlabeled_ratio', r])
     """
-    aug = ['spatial_combinations', 'moving_average', 'spectral_mean']
-    M = [10, 12, 15, 20]
+    aug = ['none', 'spatial_combinations', 'moving_average', 'spectral_mean', 'pca']
+    M = [1, 2, 4, 8, 16]
     for c in aug:
         for m in M:
-            main(['--server', '--runs', str(3), '--augment', c, '--epochs', '10', '--M', str(m)])
-    """
+            main(['--server', '--runs', str(2), '--augment', c, '--epochs', '80', '--M', str(m)])
+
 
     """
     fixed_sampling = ['False', 'True']
