@@ -143,8 +143,8 @@ if __name__ == '__main__':
                           '--epochs', str(60), '--dataset', d, '--extra_data', e, '--samples', str(40),
                           '--unlabeled_ratio', r])
             else:
-                main(['--server', '--sampling_fixed', 'True', '--method', 'fixmatch', '--runs', str(40),
-                      '--epochs', str(60), '--dataset', d, '--samples', str(),
+                main(['--server', '--sampling_fixed', 'True', '--method', 'fixmatch', '--runs', str(2),
+                      '--epochs', str(60), '--dataset', d, '--samples', str(40),
                       '--unlabeled_ratio', r])
     """
     aug = ['spatial_combinations', 'moving_average', 'spectral_mean']
