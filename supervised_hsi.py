@@ -203,7 +203,7 @@ def main(raw_args=None):
 
         train_dataset = HyperX_patches(train_img, train_gt, idx_sup, labeled=True, **vars(args))
         train_loader = data.DataLoader(train_dataset, batch_size=args.batch_size,
-                                       #pin_memory=True, num_workers=5,
+                                       pin_memory=True, num_workers=10,
                                        shuffle=True, drop_last=True)
 
         amount_labeled = idx_sup.shape[0]
