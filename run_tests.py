@@ -162,6 +162,20 @@ if __name__ == '__main__':
                       '--epochs', str(60), '--dataset', d, '--samples', str(40),
                       '--unlabeled_ratio', r])
     """
+    sampling = ['True', 'False']
+    extra_data = ['True', 'False']
+    dataset = ['Pavia', 'Salinas']
+    for s in sampling:
+        for d in dataset:
+            if d == 'Pavia':
+                for e in extra_data:
+                    main(['--server', '--sampling_fixed', s, '--method', 'mean', '--runs', str(2),
+                          '--epochs', str(60), '--dataset', d, '--extra_data', e, '--samples', str(40),
+                          '--unlabeled_ratio', r])
+            else:
+                main(['--server', '--sampling_fixed', s, '--method', 'mean', '--runs', str(2),
+                      '--epochs', str(60), '--dataset', d, '--samples', str(40),
+                      '--unlabeled_ratio', r])
     """
     aug = ['none', 'spatial_combinations', 'moving_average', 'spectral_mean', 'pca']
     M = [1, 2, 4, 8, 16]
