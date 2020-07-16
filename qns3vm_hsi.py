@@ -1,4 +1,11 @@
+import warnings
+#warnings.filterwarnings("ignore", message="numpy.dtype size changed")
+#warnings.filterwarnings("ignore", message="numpy.ufunc size changed")
+warnings.filterwarnings('ignore', message='the matrix subclass is not the recommended way')
+
 import scipy
+from qns3vm import QN_S3VM
+from datasets import get_dataset
 import numpy as np
 import os
 import random
@@ -6,7 +13,7 @@ import sklearn.svm as SVM
 import argparse
 import visdom
 
-from datasets import get_dataset
+
 
 dataset_path = '/home/oscar/Desktop/Exjobb/Data/ieee_supplement/Hyperspectral_Grids/Salinas/'
 
@@ -97,109 +104,39 @@ def main(raw_args=None):
                 X_un[i,:] = img_unlabeled[x,y,:]
                 i += 1
 
-    print('Starting TSVM...')
-
-    G = 10
+    print('Starting QN-S3VM...')
 
     C_labeled = 1.0
-    C_unlabeled = np.zeros(G)
-    C_unlabeled[0] = C_labeled/(10*G)
-    C_max = 10.0
-
-    sigma = 1.0
-    Np = 0
-    Nm = 0
-    A = np.zeros(n_classes)
+    C_unlabeled = 10.0
 
     rand_generator = random.Random()
 
-    CLF = []
+    CLF = {}
 
     no_go = []
 
     for i in range(n_classes):
         idx_class = Y == i
-        idx_rest = Y != i
-        X_train = np.concatenate((X[idx_class], X[idx_rest]))
-        Y_train = np.concatenate((np.ones(len(X[idx_class])).astype(int), -np.ones(len(X[idx_rest])).astype(int)))
-        # Classifier is a transductive SVM
-        #CLF.append(QN_S3VM(X_train.tolist(), Y_train.tolist(), X_un.tolist(), rand_generator, lam=C_labeled, lamU=C_unlabeled[0], kernel_type='RBF'))
-        #CLF[i].train()
-
-        # Classifier is a standard SVM
-        CLF.append(SVM.SVC(kernel='rbf', gamma=0.5, C=C_labeled)) #C=1000 other option
         if np.max(idx_class) == 0:
             no_go.append(i)
             break
-        CLF[i].fit(X_train,Y_train)
-
-        support = CLF[i].n_support_
-
-        Np = support[1]
-        Nm = support[0]
-
-        A[i] = np.min((Np,Nm))
 
     print('No go classes: ' + str(no_go))
     yes_go = np.delete(range(n_classes), no_go)
 
     for i in yes_go:
-        X_un_run = X_un
-        for g in range(G):
-            print('Running class: ' + str(i) + '. Time: ' + str(g))
-            #Find A transductive samples
-            values = CLF[i].decision_function(X_un)
-            values = np.asarray(values)
-
-            if np.max(values)>0 and np.min(values)<0:
-                #Extract values of positive unlabeled samples
-                values_p = np.abs(1 - values[values>0])
-                idx_p = values_p.argsort()[:int(A[i])]
-                #Threshold
-                D_p = np.sum(values[idx_p])/A[i]
-                Th_p = D_p*np.max(np.abs(values[idx_p]))
-                #Trim candidate set
-                N_p = len(values[idx_p][np.abs(values[idx_p])>=Th_p])
-
-
-                values_m = np.abs(-1 - values[values<0])
-                idx_m = values_m.argsort()[:int(A[i])]
-                #Threshold
-                D_m = np.sum(values[idx_m])/A[i]
-                Th_m = D_m*np.max(np.abs(values[idx_m]))
-                #Trim candidate set
-                N_m = len(values[idx_m][np.abs(values[idx_m])>=Th_m])
-
-                N = np.min((N_p, N_m))
-
-                if N == N_p:
-                    X_un_p = X_un_run[idx_p]
-                    X_un_m = X_un_run[idx_m[:N]]
-                    del_idx = np.concatenate((idx_p, idx_m[:N]))
-                elif N==N_m:
-                    X_un_m = X_un_run[idx_m]
-                    X_un_p = X_un_run[idx_p[:N]]
-                    del_idx = np.concatenate((idx_m, idx_p[:N]))
-
-                #Update datasets
-                idx_class = Y == i
-                idx_rest = Y != i
-                X_train = np.concatenate((X[idx_class], X[idx_rest]))
-                Y_train = np.concatenate((np.ones(len(X[idx_class])), -np.ones(len(X[idx_rest]))))
-
-                X_train = np.append(X_train, np.concatenate((X_un_m, X_un_p)), axis=0)
-                Y_train = np.append(Y_train, np.concatenate((-np.ones(len(X_un_m)), np.ones(len(X_un_p)))), axis=0)
-                X_un_run = np.delete(X_un_run, del_idx,0)
-
-                #Update weight factor
-                #C[i] = (C_max - C[0])/G^2*g^2 + C[0]
-
-                #Retrain the TSVM
-                CLF[i].fit(X_train, Y_train)
+        #Update datasets
+        idx_class = Y == i
+        idx_rest = Y != i
+        X_train = np.concatenate((X[idx_class], X[idx_rest]))
+        Y_train = np.concatenate((np.ones(len(X[idx_class])), -np.ones(len(X[idx_rest]))))
+        print(i)
+        CLF[i] = QN_S3VM(X_train.tolist(), Y_train.tolist(), X_un.tolist(), rand_generator, lam=C_labeled, lamU=C_unlabeled, kernel_type='RBF')
+        CLF[i].train()
 
     pred_values = np.zeros((n_classes, test_img.shape[0]*test_img.shape[1]))
     for i in yes_go:
-        pred_values[i,:] = (CLF[i].decision_function(test_img.reshape(-1, n_bands)))
+        pred_values[i,:] = (CLF[i].predict(test_img.reshape(-1, n_bands)))
     predicted_values = np.asarray(pred_values)
     prediction = np.argmax(predicted_values, axis=0)
     prediction = prediction.reshape(test_img.shape[:2])

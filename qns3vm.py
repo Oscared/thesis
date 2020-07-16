@@ -1,5 +1,5 @@
 ############################################################################################
-# QN-S3VM BFGS optimizer for semi-supervised support vector machines.
+# QN-S3VM BFGS optimizer for semi-supervised support vector machines. 
 #
 # This implementation provides both a L-BFGS optimization scheme
 # for semi-supvised support vector machines. Details can be found in:
@@ -29,22 +29,22 @@
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-#
+# 
 # INSTALLATION and DEPENDENCIES
 #
 # The module should work out of the box, given Python and Numpy (http://numpy.scipy.org/)
-# and Scipy (http://scipy.org/) installed correctly.
-#
-# We have tested the code on Ubuntu 12.04 (32 Bit) with Python 2.7.3, Numpy 1.6.1,
-# and Scipy 0.9.0. Installing these packages on a Ubuntu- or Debian-based systems
+# and Scipy (http://scipy.org/) installed correctly. 
+# 
+# We have tested the code on Ubuntu 12.04 (32 Bit) with Python 2.7.3, Numpy 1.6.1, 
+# and Scipy 0.9.0. Installing these packages on a Ubuntu- or Debian-based systems 
 # can be done via "sudo apt-get install python python-numpy python-scipy".
 #
 #
 # RUNNING THE EXAMPLES
-#
-# For a description of the data sets, see the paper mentioned above and the references
+# 
+# For a description of the data sets, see the paper mentioned above and the references 
 # therein. Running the command "python qns3vm.py" should yield an output similar to:
-#
+# 
 # Sparse text data set instance
 # Number of labeled patterns:  48
 # Number of unlabeled patterns:  924
@@ -107,9 +107,9 @@ class QN_S3VM:
         kernel_type -- "Linear" or "RBF" (default "Linear")
         numR -- implementation of subset of regressors. If None is provided, all patterns are used
                 (no approximation). Must fulfill 0 <= numR <= len(X_l) + len(X_u) (default None)
-        estimate_r -- desired ratio for positive and negative assigments for
-                      unlabeled patterns (-1.0 <= estimate_r <= 1.0). If estimate_r=None,
-                      then L_l is used to estimate this ratio (in case len(L_l) >=
+        estimate_r -- desired ratio for positive and negative assigments for 
+                      unlabeled patterns (-1.0 <= estimate_r <= 1.0). If estimate_r=None, 
+                      then L_l is used to estimate this ratio (in case len(L_l) >= 
                       minimum_labeled_patterns_for_estimate_r. Otherwise use estimate_r = 0.0
                       (default None)
         minimum_labeled_patterns_for_estimate_r -- see above (default 0)
@@ -146,7 +146,7 @@ class QN_S3VM:
         Computes the predicted labels for a given set of patterns
 
         Keyword arguments:
-        X -- The set of patterns
+        X -- The set of patterns 
         real_valued -- If True, then the real prediction values are returned
 
         Returns:
@@ -159,7 +159,7 @@ class QN_S3VM:
         Predicts a label (-1 or +1) for the pattern
 
         Keyword arguments:
-        x -- The pattern
+        x -- The pattern 
 
         Returns:
         The prediction for x.
@@ -169,9 +169,9 @@ class QN_S3VM:
     def predictValue(self, x):
         """
         Computes f(x) for a given pattern (see Representer Theorem)
-
+    
         Keyword arguments:
-        x -- The pattern
+        x -- The pattern 
 
         Returns:
         The (real) prediction value for x.
@@ -180,7 +180,7 @@ class QN_S3VM:
 
     def getNeededFunctionCalls(self):
         """
-        Returns the number of function calls needed during
+        Returns the number of function calls needed during 
         the optimization process.
         """
         return self.__model.getNeededFunctionCalls()
@@ -243,7 +243,7 @@ class QN_S3VM_Dense:
         Computes the predicted labels for a given set of patterns
 
         Keyword arguments:
-        X -- The set of patterns
+        X -- The set of patterns 
         real_valued -- If True, then the real prediction values are returned
 
         Returns:
@@ -254,29 +254,30 @@ class QN_S3VM_Dense:
         KNU_bar_horizontal_sum = (1.0 / len(self.__X_u_subset)) * KNU_bar.sum(axis=1)
         KNR = KNR - KNU_bar_horizontal_sum - self.__KU_barR_vertical_sum + self.__KU_barU_bar_sum
         preds = KNR * self.__c[0:self.__dim-1,:] + self.__c[self.__dim-1,:]
+        print(type(preds))
         if real_valued == True:
             return preds.flatten(1).tolist()[0]
         else:
-            return np.sign(np.sign(preds)+0.1).flatten(1).tolist()[0]
-
+            return np.sign(np.sign(preds)+0.1).flatten().tolist()[0]
+    
     def predict(self, x):
         """
         Predicts a label for the pattern
 
         Keyword arguments:
-        x -- The pattern
+        x -- The pattern 
 
         Returns:
         The prediction for x.
         """
         return self.getPredictions([x], real_valued=False)[0]
-
+        
     def predictValue(self, x):
         """
         Computes f(x) for a given pattern (see Representer Theorem)
-
+    
         Keyword arguments:
-        x -- The pattern
+        x -- The pattern 
 
         Returns:
         The (real) prediction value for x.
@@ -285,7 +286,7 @@ class QN_S3VM_Dense:
 
     def getNeededFunctionCalls(self):
         """
-        Returns the number of function calls needed during
+        Returns the number of function calls needed during 
         the optimization process.
         """
         return self.__needed_function_calls
@@ -306,7 +307,7 @@ class QN_S3VM_Dense:
             assert (self.__numR <= len(self.__X)) and (self.__numR > 0)
         else:
             self.__numR = len(self.__X)
-        self.__regressors_indices = sorted(self.__random_generator.sample( list(range(0,len(self.__X))), self.__numR ))
+        self.__regressors_indices = sorted(self.__random_generator.sample( range(0,len(self.__X)), self.__numR ))
         self.__dim = self.__numR + 1 # add bias term b
         self.__minimum_labeled_patterns_for_estimate_r = float(self.parameters['minimum_labeled_patterns_for_estimate_r'])
         # If reliable estimate is available or can be estimated, use it, otherwise
@@ -320,7 +321,7 @@ class QN_S3VM_Dense:
         self.__BFGS_m = int(self.parameters['BFGS_m'])
         self.__BFGS_maxfun = int(self.parameters['BFGS_maxfun'])
         self.__BFGS_factr = float(self.parameters['BFGS_factr'])
-        # This is a hack for 64 bit systems (Linux). The machine precision
+        # This is a hack for 64 bit systems (Linux). The machine precision 
         # is different for the BFGS optimizer (Fortran code) and we fix this by:
         is_64bits = sys.maxsize > 2**32
         if is_64bits:
@@ -381,7 +382,7 @@ class QN_S3VM_Dense:
             self.__KNR = cp.deepcopy(bmat([[self.__KLR], [self.__KUR]]))
             self.__KRR = self.__KNR[self.__regressors_indices,:]
             # Center patterns in feature space (with respect to approximated mean of unlabeled patterns in the feature space)
-            subset_unlabled_indices = sorted(self.__random_generator.sample( list(range(0,len(self.__X_u))), min(self.__max_unlabeled_subset_size, len(self.__X_u)) ))
+            subset_unlabled_indices = sorted(self.__random_generator.sample( range(0,len(self.__X_u)), min(self.__max_unlabeled_subset_size, len(self.__X_u)) ))
             self.__X_u_subset = (mat(self.__X_u)[subset_unlabled_indices,:].tolist())
             self.__KNU_bar = self.__kernel.computeKernelMatrix(self.__X, self.__X_u_subset, symmetric=False)
             self.__KNU_bar_horizontal_sum = (1.0 / len(self.__X_u_subset)) * self.__KNU_bar.sum(axis=1)
@@ -391,12 +392,12 @@ class QN_S3VM_Dense:
             self.__KU_barU_bar_sum = (1.0 / (len(self.__X_u_subset)))**2 * self.__KU_barU_bar.sum()
             self.__KNR = self.__KNR - self.__KNU_bar_horizontal_sum - self.__KU_barR_vertical_sum + self.__KU_barU_bar_sum
             self.__KRR = self.__KNR[self.__regressors_indices,:]
-            self.__KLR = self.__KNR[list(range(0,len(self.__X_l))),:]
-            self.__KUR = self.__KNR[list(range(len(self.__X_l),len(self.__X))),:]
+            self.__KLR = self.__KNR[range(0,len(self.__X_l)),:]
+            self.__KUR = self.__KNR[range(len(self.__X_l),len(self.__X)),:]
             self.__matrices_initialized = True
 
     def __getFitness(self,c):
-        # Check whether the function is called from the bfgs solver
+        # Check whether the function is called from the bfgs solver 
         # (that does not optimize the offset b) or not
         if len(c) == self.__dim - 1:
             c = np.append(c, self.__b)
@@ -405,17 +406,17 @@ class QN_S3VM_Dense:
         c_new = c[:,0:self.__dim-1].T
         preds_labeled = self.__surrogate_gamma*(1.0 - multiply(self.__YL, self.__KLR * c_new + b))
         preds_unlabeled = self.__KUR * c_new + b
-        # This vector has a "one" for each "numerically instable" entry; "zeros" for "good ones".
+        # This vector has a "one" for each "numerically instable" entry; "zeros" for "good ones". 
         preds_labeled_conflict_indicator = np.sign(np.sign(preds_labeled/self.__breakpoint_for_exp - 1.0) + 1.0)
         # This vector has a one for each good entry and zero otherwise
         preds_labeled_good_indicator = (-1)*(preds_labeled_conflict_indicator - 1.0)
-        preds_labeled_for_conflicts = multiply(preds_labeled_conflict_indicator,preds_labeled)
+        preds_labeled_for_conflicts = multiply(preds_labeled_conflict_indicator,preds_labeled) 
         preds_labeled = multiply(preds_labeled,preds_labeled_good_indicator)
         # Compute values for good entries
         preds_labeled_log_exp = np.log(1.0 + np.exp(preds_labeled))
         # Compute values for instable entries
         preds_labeled_log_exp = multiply(preds_labeled_good_indicator, preds_labeled_log_exp)
-        # Replace critical values with values
+        # Replace critical values with values 
         preds_labeled_final = preds_labeled_log_exp + preds_labeled_for_conflicts
         term1 = (1.0/(self.__surrogate_gamma*self.__size_l)) * np.sum(preds_labeled_final)
         preds_unlabeled_squared = multiply(preds_unlabeled,preds_unlabeled)
@@ -424,7 +425,7 @@ class QN_S3VM_Dense:
         return (term1 + term2 + term3)[0,0]
 
     def __getFitness_Prime(self,c):
-        # Check whether the function is called from the bfgs solver
+        # Check whether the function is called from the bfgs solver 
         # (that does not optimize the offset b) or not
         if len(c) == self.__dim - 1:
             c = np.append(c, self.__b)
@@ -433,7 +434,7 @@ class QN_S3VM_Dense:
         c_new = c[:,0:self.__dim-1].T
         preds_labeled = self.__surrogate_gamma * (1.0 - multiply(self.__YL, self.__KLR * c_new + b))
         preds_unlabeled = (self.__KUR * c_new + b)
-        # This vector has a "one" for each "numerically instable" entry; "zeros" for "good ones".
+        # This vector has a "one" for each "numerically instable" entry; "zeros" for "good ones". 
         preds_labeled_conflict_indicator = np.sign(np.sign(preds_labeled/self.__breakpoint_for_exp - 1.0) + 1.0)
         # This vector has a one for each good entry and zero otherwise
         preds_labeled_good_indicator = (-1)*(preds_labeled_conflict_indicator - 1.0)
@@ -460,12 +461,12 @@ class QN_S3VM_Dense:
         if real_valued == True:
             return preds.flatten(1).tolist()[0]
         else:
-            return np.sign(np.sign(preds)+0.1).flatten(1).tolist()[0]
+            return np.sign(np.sign(preds)+0.1).flatten().tolist()[0]
 
     def __check_matrix(self, M):
         smallesteval = scipy.linalg.eigvalsh(M, eigvals=(0,0))[0]
         if smallesteval < 0.0:
-            shift = abs(smallesteval) + 0.0000001
+            shift = abs(smallesteval) + 0.0000001 
             M = M + shift
         return M
 
@@ -540,7 +541,7 @@ class QN_S3VM_Sparse:
         Computes the predicted labels for a given set of patterns
 
         Keyword arguments:
-        X -- The set of patterns
+        X -- The set of patterns 
         real_valued -- If True, then the real prediction values are returned
 
         Returns:
@@ -550,34 +551,35 @@ class QN_S3VM_Sparse:
         W = self.X.T*c_new - self.__mean_u.T*np.sum(c_new)
         # Again, possibility of dimension mismatch due to use of sparse matrices
         if X.shape[1] > W.shape[0]:
-            X = X[:,list(range(W.shape[0]))]
+            X = X[:,range(W.shape[0])]
         if X.shape[1] < W.shape[0]:
-            W = W[list(range(X.shape[1]))]
+            W = W[range(X.shape[1])]
         X = X.tocsc()
         preds = X * W + self.__b
+        print(type(preds))
         if real_valued == True:
-            return preds.flatten(1).tolist()[0]
+            return preds.flatten().tolist()[0]
         else:
-            return np.sign(np.sign(preds)+0.1).flatten(1).tolist()[0]
+            return np.sign(np.sign(preds)+0.1).flatten().tolist()[0]
 
     def predict(self, x):
         """
         Predicts a label for the pattern
 
         Keyword arguments:
-        x -- The pattern
+        x -- The pattern 
 
         Returns:
         The prediction for x.
         """
         return self.getPredictions([x], real_valued=False)[0]
-
+        
     def predictValue(self, x):
         """
         Computes f(x) for a given pattern (see Representer Theorem)
-
+    
         Keyword arguments:
-        x -- The pattern
+        x -- The pattern 
 
         Returns:
         The (real) prediction value for x.
@@ -586,7 +588,7 @@ class QN_S3VM_Sparse:
 
     def getNeededFunctionCalls(self):
         """
-        Returns the number of function calls needed during
+        Returns the number of function calls needed during 
         the optimization process.
         """
         return self.__needed_function_calls
@@ -612,7 +614,7 @@ class QN_S3VM_Sparse:
         self.__BFGS_m = int(self.parameters['BFGS_m'])
         self.__BFGS_maxfun = int(self.parameters['BFGS_maxfun'])
         self.__BFGS_factr = float(self.parameters['BFGS_factr'])
-        # This is a hack for 64 bit systems (Linux). The machine precision
+        # This is a hack for 64 bit systems (Linux). The machine precision 
         # is different for the BFGS optimizer (Fortran code) and we fix this by:
         is_64bits = sys.maxsize > 2**32
         if is_64bits:
@@ -650,7 +652,7 @@ class QN_S3VM_Sparse:
         return c_opt
 
     def __getFitness(self,c):
-        # check whether the function is called from the bfgs solver
+        # check whether the function is called from the bfgs solver 
         # (that does not optimize the offset b) or not
         if len(c) == self.__dim - 1:
             c = np.append(c, self.__b)
@@ -661,17 +663,17 @@ class QN_S3VM_Sparse:
         XTc = self.X_T*c_new - self.__mean_u.T*c_new_sum
         preds_labeled = self.__surrogate_gamma*(1.0 - multiply(self.__YL, (self.X_l*XTc - self.__mean_u*XTc) + b[0,0]))
         preds_unlabeled = (self.X_u*XTc - self.__mean_u*XTc)  + b[0,0]
-        # This vector has a "one" for each "numerically instable" entry; "zeros" for "good ones".
+        # This vector has a "one" for each "numerically instable" entry; "zeros" for "good ones". 
         preds_labeled_conflict_indicator = np.sign(np.sign(preds_labeled/self.__breakpoint_for_exp - 1.0) + 1.0)
         # This vector has a one for each good entry and zero otherwise
         preds_labeled_good_indicator = (-1)*(preds_labeled_conflict_indicator - 1.0)
-        preds_labeled_for_conflicts = multiply(preds_labeled_conflict_indicator,preds_labeled)
+        preds_labeled_for_conflicts = multiply(preds_labeled_conflict_indicator,preds_labeled) 
         preds_labeled = multiply(preds_labeled,preds_labeled_good_indicator)
         # Compute values for good entries
         preds_labeled_log_exp = np.log(1.0 + np.exp(preds_labeled))
         # Compute values for instable entries
         preds_labeled_log_exp = multiply(preds_labeled_good_indicator, preds_labeled_log_exp)
-        # Replace critical values with values
+        # Replace critical values with values 
         preds_labeled_final = preds_labeled_log_exp + preds_labeled_for_conflicts
         term1 = (1.0/(self.__surrogate_gamma*self.__size_l)) * np.sum(preds_labeled_final)
         preds_unlabeled_squared = multiply(preds_unlabeled,preds_unlabeled)
@@ -680,7 +682,7 @@ class QN_S3VM_Sparse:
         return (term1 + term2 + term3)[0,0]
 
     def __getFitness_Prime(self,c):
-        # check whether the function is called from the bfgs solver
+        # check whether the function is called from the bfgs solver 
         # (that does not optimize the offset b) or not
         if len(c) == self.__dim - 1:
             c = np.append(c, self.__b)
@@ -736,7 +738,7 @@ class LinearKernel():
         assert self._data1.shape[1] == (self._data2.T).shape[0]
         try:
             return self._data1 * self._data2.T
-        except Exception as e:
+        except:
             logging.error("Error while computing kernel matrix: " + str(e))
             sys.exit()
         logging.debug("Kernel Matrix computed...")
@@ -772,24 +774,24 @@ class DictLinearKernel():
         try:
             km = mat(zeros((self._dim1, self._dim2), dtype=float64))
             if self._symmetric:
-                for i in range(self._dim1):
+                for i in xrange(self._dim1):
                     message = 'Kernel Matrix Progress: %dx%d/%dx%d' % (i, self._dim2,self._dim1,self._dim2)
                     logging.debug(message)
-                    for j in range(i, self._dim2):
+                    for j in xrange(i, self._dim2):
                         val = self.getKernelValue(self._data1[i], self._data2[j])
                         km[i, j] = val
                         km[j, i] = val
                 return km
             else:
-                for i in range(self._dim1):
+                for i in xrange(self._dim1):
                     message = 'Kernel Matrix Progress: %dx%d/%dx%d' % (i, self._dim2,self._dim1,self._dim2)
                     logging.debug(message)
-                    for j in range(0, self._dim2):
+                    for j in xrange(0, self._dim2):
                         val = self.getKernelValue(self._data1[i], self._data2[j])
                         km[i, j] = val
                 return km
-
-        except Exception as e:
+            
+        except:
             logging.error("Error while computing kernel matrix: " + str(e))
             sys.exit()
         logging.debug("Kernel Matrix computed...")
@@ -816,13 +818,14 @@ class RBFKernel():
         """
         Computes the kernel matrix
         """
-        logging.debug("Starting RBF Kernel Matrix Computation...")
+        print("Starting RBF Kernel Matrix Computation...")
         self._data1 = mat(data1)
         self._data2 = mat(data2)
         assert self._data1.shape[1] == (self._data2.T).shape[0]
         self._dim1 = len(data1)
         self._dim2 = len(data2)
         self._symmetric = symmetric
+        print("Symmetric: ", symmetric)
         self.__km = None
         try:
             if self._symmetric:
@@ -833,7 +836,7 @@ class RBFKernel():
                 self.__km = self.__km - 2*linearkm
                 self.__km = - self.__sigma_squared_inv * self.__km
                 self.__km = np.exp(self.__km)
-                return self.__km
+                return self.__km   
             else:
                 m = self._data1.shape[0]
                 n = self._data2.shape[0]
@@ -853,7 +856,7 @@ class RBFKernel():
                 self.__km = - self.__sigma_squared_inv * self.__km
                 self.__km = np.exp(self.__km)
                 return self.__km
-        except Exception as e:
+        except:
             logging.error("Error while computing kernel matrix: " + str(e))
             sys.exit()
 
@@ -889,23 +892,23 @@ class DictRBFKernel():
         try:
             km = mat(zeros((self._dim1, self._dim2), dtype=float64))
             if self._symmetric:
-                for i in range(self._dim1):
+                for i in xrange(self._dim1):
                     message = 'Kernel Matrix Progress: %dx%d/%dx%d' % (i, self._dim2,self._dim1,self._dim2)
                     logging.debug(message)
-                    for j in range(i, self._dim2):
+                    for j in xrange(i, self._dim2):
                         val = self.getKernelValue(self._data1[i], self._data2[j])
                         km[i, j] = val
                         km[j, i] = val
                 return km
             else:
-                for i in range(0, self._dim1):
+                for i in xrange(0, self._dim1):
                     message = 'Kernel Matrix Progress: %dx%d/%dx%d' % (i, self._dim2,self._dim1,self._dim2)
                     logging.debug(message)
-                    for j in range(0, self._dim2):
+                    for j in xrange(0, self._dim2):
                         val = self.getKernelValue(self._data1[i], self._data2[j])
                         km[i, j] = val
                 return km
-        except Exception as e:
+        except:
             logging.error("Error while computing kernel matrix: " + str(e))
             sys.exit()
         logging.info("Kernel Matrix computed...")
@@ -951,8 +954,8 @@ if __name__ == "__main__":
     elapsed_time = t_end - t_start
     preds = model.getPredictions(X_test)
     error = examples.classification_error(preds,L_test)
-    print ("Time needed to compute the model: ", elapsed_time, " seconds")
-    print ("Classification error of QN-S3VM: ", error)
+    print("Time needed to compute the model: ", elapsed_time, " seconds")
+    print("Classification error of QN-S3VM: ", error)
 
     # dense moons data set
     X_train_l, L_train_l, X_train_u, X_test, L_test = examples.get_moons_data(my_random_generator)
@@ -966,6 +969,8 @@ if __name__ == "__main__":
     elapsed_time = t_end - t_start
     preds = model.getPredictions(X_test)
     error = examples.classification_error(preds,L_test)
-    print ("Time needed to compute the model: ", elapsed_time, " seconds")
-    print ("Classification error of QN-S3VM: ", error)
-    print ("")
+    print("Time needed to compute the model: ", elapsed_time, " seconds")
+    print("Classification error of QN-S3VM: ", error)    
+
+    print("")
+

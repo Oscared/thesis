@@ -82,6 +82,7 @@ def band_combination(self, data, M=1):
     #Test to see if it is possible to use a magnitude as scaling fator for amount of samples to mix from
     size = 2*M
     new_image = np.zeros_like(data)
+    splits = c/(M*4)
     for x in range(h):
         for y in range(w):
             x1 = np.clip(x - size // 2, 0, h)
@@ -95,10 +96,15 @@ def band_combination(self, data, M=1):
                 if np.sum(patch[p,:])==0:
                     delete_idx.append(p)
             patch = np.delete(patch, delete_idx, 0)
+            patch_bands = np.zeros((patch.shape[0], math.ceil(splits), 4*M))
+            for i in range(math.ceil(splits)):
+                patch_bands[:, i, :] = patch[:,int(c*i/splits):int(c*(i+1)/splits)]
             if patch.shape[0] == 0:
                 new_image[x,y,:] = 0
             else:
-                new_image[x,y,:] = 0
+                for i in range(math.ceil(splits)):
+                    rand_band = np.random.randint(patch.shape[0])
+                    new_image[x,y,int(c*i/splits):int(c*(i+1)/splits)] = patch_bands[rand_band, i, :]
         return new_image
 
 def identity(data):

@@ -3,6 +3,7 @@ import argparse
 from fixmatch_hsi import main as fixmatch
 from supervised_hsi import main as supervised
 from mixup_hsi import main as mixup
+from teacher_student_hsi import main as mean
 import numpy as np
 from tensorboardX import SummaryWriter
 import datetime
@@ -104,6 +105,14 @@ def main(raw_args=None):
                                 '--epochs', '{}'.format(args.epochs), '--lr', '{}'.format(args.lr),
                                 '--batch_size', '{}'.format(args.batch_size), '--fold', '{}'.format(f),
                                 '--cuda', '0', '--sampling_fixed', args.sampling_fixed])
+            elif args.method == 'mean':
+                result = mean(['--class_balancing', '--dataset', args.dataset,
+                                '--data_dir', data_path.format(data_folder), '--results', 'results/{}/'.format(args.run_name),
+                                '--epochs', '{}'.format(args.epochs), '--lr', '{}'.format(args.lr),
+                                '--batch_size', '{}'.format(args.batch_size), '--fold', '{}'.format(f),
+                                '--cuda', '0', '--sampling_fixed', args.sampling_fixed,
+                                '--extra_data', args.extra_data, '--unlabeled_ratio', str(args.unlabeled_ratio),
+                                '--samples_per_class', str(args.samples), '--model', args.model])
             elif args.method == 'fixmatch':
                 result = fixmatch(['--model', args.model, '--pretrain', str(args.pretrain),
                                    '--augmentation_magnitude', str(args.M), '--class_balancing',
@@ -153,12 +162,13 @@ if __name__ == '__main__':
                       '--epochs', str(60), '--dataset', d, '--samples', str(40),
                       '--unlabeled_ratio', r])
     """
+    """
     aug = ['none', 'spatial_combinations', 'moving_average', 'spectral_mean', 'pca']
     M = [1, 2, 4, 8, 16]
     for c in aug:
         for m in M:
             main(['--server', '--runs', str(2), '--augment', c, '--epochs', '80', '--M', str(m)])
-
+    """
 
     """
     fixed_sampling = ['False', 'True']
