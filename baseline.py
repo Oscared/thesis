@@ -48,6 +48,9 @@ def main(raw_args=None):
     parser.add_argument('--model', type=str, default='SVM',
                         help='choose which model to use. Defaults to SVM.')
 
+    parser.add_argument('--model', type=str, default='SVM',
+                        help='choose which model to use. Defaults to SVM.')
+
     args = parser.parse_args(raw_args)
 
     device = utils.get_device(args.cuda)

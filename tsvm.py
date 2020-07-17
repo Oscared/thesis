@@ -1,14 +1,16 @@
 import scipy
+import seaborn as sns
 import numpy as np
 import os
 import random
 import sklearn.svm as SVM
 import argparse
 import visdom
+import utils
 
 from datasets import get_dataset
 
-dataset_path = '/home/oscar/Desktop/Exjobb/Data/ieee_supplement/Hyperspectral_Grids/Salinas/'
+dataset_path = '/data/ieee_supplement/Hyperspectral_Grids/Salinas/'
 
 def main(raw_args=None):
     parser = argparse.ArgumentParser(description='Transductive SVM implementation.')
@@ -32,7 +34,7 @@ def main(raw_args=None):
     else:
         vis = None
 
-    data_path = '/home/oscar/Desktop/Exjobb/Data/ieee_supplement/Hyperspectral_Grids/{}'
+    data_path = '/data/ieee_supplement/Hyperspectral_Grids/{}'
 
     if args.dataset == 'Salinas':
         data_folder = 'Salinas'
@@ -47,7 +49,7 @@ def main(raw_args=None):
     if args.dataset == 'Pavia' and args.extra_data == 'True':
         train_img, train_gt, test_img, test_gt, label_values, ignored_labels, rgb_bands, palette = get_patch_data('pavia', 1, target_folder=data_path.format(data_folder), fold=args.fold)
         args.n_bands = train_img.shape[-1]
-        img_unlabeled, _, _, _, _, _ = get_dataset('PaviaC', target_folder='/home/oscar/Desktop/Exjobb/Data/')
+        img_unlabeled, _, _, _, _, _ = get_dataset('PaviaC', target_folder='/data/')
 
         img_unlabeled = np.concatenate((img_unlabeled, img_unlabeled[:,:,-1, np.newaxis]), axis=-1)
 
@@ -106,7 +108,7 @@ def main(raw_args=None):
 
     print('Starting TSVM...')
 
-    G = 10
+    G = 2
 
     C_labeled = 1.0
     C_unlabeled = np.zeros(G)
@@ -152,7 +154,7 @@ def main(raw_args=None):
     for i in yes_go:
         X_un_run = X_un
         for g in range(G):
-            print('Running class: ' + str(i) + '. Time: ' + str(g))
+            #print('Running class: ' + str(i) + '. Time: ' + str(g))
             #Find A transductive samples
             values = CLF[i].decision_function(X_un)
             values = np.asarray(values)
@@ -381,7 +383,7 @@ def get_pixel_idx(data, gt, ignored_labels, patch_size):
 if __name__ == '__main__':
     datasets = ['Pavia', 'Salinas', 'Indian']
     runs = 2
-
+    results = []
     for dataset in datasets:
         if dataset == 'Indian':
             folds = 4
@@ -400,3 +402,4 @@ if __name__ == '__main__':
         print('Ran all the folds for: ' + dataset)
         print('Average accuracy per fold: ' + str(avg_acc))
         print('Total average accuracy: ' + str(np.sum(avg_acc)/len(avg_acc)))
+        print(results)
