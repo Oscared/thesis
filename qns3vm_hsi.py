@@ -4,6 +4,7 @@ import warnings
 warnings.filterwarnings('ignore', message='the matrix subclass is not the recommended way')
 
 import scipy
+import seaborn as sns
 from qns3vm import QN_S3VM
 from datasets import get_dataset
 import numpy as np
@@ -57,6 +58,13 @@ def main(raw_args=None):
         img_unlabeled, _, _, _, _, _ = get_dataset('PaviaC', target_folder='/home/oscar/Desktop/Exjobb/Data/')
 
         img_unlabeled = np.concatenate((img_unlabeled, img_unlabeled[:,:,-1, np.newaxis]), axis=-1)
+
+    if palette is None:
+        # Generate color palette
+        palette = {0: (0, 0, 0)}
+        for k, color in enumerate(sns.color_palette("hls", len(label_values) - 1)):
+            palette[k + 1] = tuple(np.asarray(255 * np.array(color), dtype='uint8'))
+    invert_palette = {v: k for k, v in palette.items()}
 
     def convert_to_color(x):
         return convert_to_color_(x, palette=palette)
@@ -119,7 +127,6 @@ def main(raw_args=None):
         idx_class = Y == i
         if np.max(idx_class) == 0:
             no_go.append(i)
-            break
 
     print('No go classes: ' + str(no_go))
     yes_go = np.delete(range(n_classes), no_go)
@@ -323,7 +330,7 @@ if __name__ == '__main__':
 
         for f in range(0,folds):
             for r in range(runs):
-                result = main(['--dataset', dataset, '--fold', f, '--use_vis'])
+                result = main(['--dataset', dataset, '--fold', f])
                 results.append(result)
                 avg_acc[f] += result['Accuracy']
 

@@ -25,7 +25,7 @@ def main(raw_args=None):
     parser.add_argument('--save', action='store_true',
                         help='use to save model weights when running')
 
-    parser.add_argument('--results', type=str, default='results',
+    parser.add_argument('--results', type=str, default='results/baseline',
                         help='where to save results to (default results)')
     parser.add_argument('--save_dir', type=str, default='/saves/',
                         help='where to save models to (default /saves/)')
@@ -39,12 +39,14 @@ def main(raw_args=None):
                         help='Which fold to sample from if using Nalepas validation scheme')
     parser.add_argument('--sampling_fixed', type=str, default='True',
                         help='Use to sample a fixed amount of samples for each class from Nalepa sampling')
-    parser.add_argument('--samples_per_class', type=int, default=10,
+    parser.add_argument('--samples_per_class', type=int, default=40,
                         help='Amount of samples to sample for each class when sampling a fixed amount. Defaults to 10.')
 
 
     parser.add_argument('--supervision', type=str, default='full',
                         help='check this more, use to make us of all labeled or not, full or semi')
+    parser.add_argument('--model', type=str, default='SVM',
+                        help='choose which model to use. Defaults to SVM.')
 
     args = parser.parse_args(raw_args)
 
@@ -167,3 +169,44 @@ def main(raw_args=None):
     writer.close()
 
     return run_results
+
+if __name__ == '__main__':
+    datasets = ['Pavia', 'Salinas', 'Indian']
+    models = ['SVM', 'RF', 'XGBOOST']
+    sampling = ['True', 'False']
+    runs = 2
+
+    for m in models:
+        for s in sampling:
+            for dataset in datasets:
+                if dataset == 'Indian':
+                    folds = 4
+                else:
+                    folds = 5
+
+                tensorboard_dir = str('results/baseline/overall/' + m + '/sampling_' + s + '/' + d)
+
+                os.makedirs(tensorboard_dir, exist_ok=True)
+                writer = SummaryWriter(tensorboard_dir)
+
+                avg_acc = np.zeros(folds)
+
+                results = []
+
+                for f in range(0,folds):
+                    for r in range(runs):
+                        result = main(['--model', m, '--dataset', dataset, '--fold', str(f)])
+                        results.append(result)
+                        avg_acc[f] += result['Accuracy']
+
+                avg_acc = avg_acc/args.runs
+                print('Ran all the folds for: ' + dataset)
+
+                print('Average accuracy per fold: ' + str(avg_acc))
+                writer.add_text('Average accuracy per fold', str(avg_acc))
+
+                print('Total average accuracy: ' + str(np.sum(avg_acc)/len(avg_acc)))
+                writer.add_text('Total average accuracy', str(np.sum(avg_acc)/len(avg_acc)))
+
+                print('Results: ' + str(results))
+                writer.add_text('All results', str(results))

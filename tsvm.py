@@ -51,6 +51,13 @@ def main(raw_args=None):
 
         img_unlabeled = np.concatenate((img_unlabeled, img_unlabeled[:,:,-1, np.newaxis]), axis=-1)
 
+    if palette is None:
+        # Generate color palette
+        palette = {0: (0, 0, 0)}
+        for k, color in enumerate(sns.color_palette("hls", len(label_values) - 1)):
+            palette[k + 1] = tuple(np.asarray(255 * np.array(color), dtype='uint8'))
+    invert_palette = {v: k for k, v in palette.items()}
+
     def convert_to_color(x):
         return convert_to_color_(x, palette=palette)
     def convert_from_color(x):
@@ -130,15 +137,14 @@ def main(raw_args=None):
         CLF.append(SVM.SVC(kernel='rbf', gamma=0.5, C=C_labeled)) #C=1000 other option
         if np.max(idx_class) == 0:
             no_go.append(i)
-            break
-        CLF[i].fit(X_train,Y_train)
+        else:
+            CLF[i].fit(X_train,Y_train)
 
-        support = CLF[i].n_support_
+            support = CLF[i].n_support_
+            Np = support[1]
+            Nm = support[0]
 
-        Np = support[1]
-        Nm = support[0]
-
-        A[i] = np.min((Np,Nm))
+            A[i] = np.min((Np,Nm))
 
     print('No go classes: ' + str(no_go))
     yes_go = np.delete(range(n_classes), no_go)
@@ -386,7 +392,7 @@ if __name__ == '__main__':
 
         for f in range(0,folds):
             for r in range(runs):
-                result = main(['--dataset', dataset, '--fold', f, '--use_vis'])
+                result = main(['--dataset', dataset, '--fold', str(f)])
                 results.append(result)
                 avg_acc[f] += result['Accuracy']
 
