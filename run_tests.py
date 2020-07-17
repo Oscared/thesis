@@ -170,12 +170,10 @@ if __name__ == '__main__':
             if d == 'Pavia':
                 for e in extra_data:
                     main(['--server', '--sampling_fixed', s, '--method', 'mean', '--runs', str(2),
-                          '--epochs', str(60), '--dataset', d, '--extra_data', e, '--samples', str(40),
-                          '--unlabeled_ratio', r])
+                          '--epochs', str(60), '--dataset', d, '--extra_data', e, '--samples', str(40)])
             else:
                 main(['--server', '--sampling_fixed', s, '--method', 'mean', '--runs', str(2),
-                      '--epochs', str(60), '--dataset', d, '--samples', str(40),
-                      '--unlabeled_ratio', r])
+                      '--epochs', str(60), '--dataset', d, '--samples', str(40)])
     """
     aug = ['none', 'spatial_combinations', 'moving_average', 'spectral_mean', 'pca']
     M = [1, 2, 4, 8, 16]

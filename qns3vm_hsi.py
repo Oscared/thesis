@@ -15,7 +15,7 @@ import visdom
 
 
 
-dataset_path = '/home/oscar/Desktop/Exjobb/Data/ieee_supplement/Hyperspectral_Grids/Salinas/'
+dataset_path = '/data/ieee_supplement/Hyperspectral_Grids/Salinas/'
 
 def main(raw_args=None):
     parser = argparse.ArgumentParser(description='Transductive SVM implementation.')
@@ -39,7 +39,7 @@ def main(raw_args=None):
     else:
         vis = None
 
-    data_path = '/home/oscar/Desktop/Exjobb/Data/ieee_supplement/Hyperspectral_Grids/{}'
+    data_path = '/data/ieee_supplement/Hyperspectral_Grids/{}'
 
     if args.dataset == 'Salinas':
         data_folder = 'Salinas'
