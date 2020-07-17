@@ -242,7 +242,7 @@ def main(raw_args=None):
 
         train_unlabeled_dataset = HyperX_patches(train_img, train_gt, idx_unsup, labeled=False, **vars(args))
         if args.dataset == 'Pavia' and args.extra_data == 'True':
-            train_unlabeled_dataset = data.ConcatDataset([train_unlabeled_dataset,
+            train_unlabeled_dataset = data.ConcatDataset([#train_unlabeled_dataset,
                                                           HyperX_patches(img_1, gt_1, idx_1, labeled=False, **vars(args)),
                                                           HyperX_patches(img_2, gt_2, idx_2, labeled=False, **vars(args))])
         train_unlabeled_loader = data.DataLoader(train_unlabeled_dataset, batch_size=args.batch_size*unlabeled_ratio,

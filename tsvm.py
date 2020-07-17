@@ -108,7 +108,7 @@ def main(raw_args=None):
 
     print('Starting TSVM...')
 
-    G = 2
+    G = 5
 
     C_labeled = 1.0
     C_unlabeled = np.zeros(G)
@@ -156,7 +156,7 @@ def main(raw_args=None):
         for g in range(G):
             #print('Running class: ' + str(i) + '. Time: ' + str(g))
             #Find A transductive samples
-            values = CLF[i].decision_function(X_un)
+            values = CLF[i].decision_function(X_un_run)
             values = np.asarray(values)
 
             if np.max(values)>0 and np.min(values)<0:
@@ -383,7 +383,7 @@ def get_pixel_idx(data, gt, ignored_labels, patch_size):
 if __name__ == '__main__':
     datasets = ['Pavia', 'Salinas', 'Indian']
     runs = 2
-    results = []
+
     for dataset in datasets:
         if dataset == 'Indian':
             folds = 4
@@ -391,6 +391,7 @@ if __name__ == '__main__':
             folds = 5
 
         avg_acc = np.zeros(folds)
+        results = []
 
         for f in range(0,folds):
             for r in range(runs):

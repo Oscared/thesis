@@ -146,21 +146,24 @@ def main(raw_args=None):
     writer.close()
 
 if __name__ == '__main__':
-    """
-    ratio = ['2', '4', '8', '16']
+
+    method = ['fixmatch', 'supervised']
     extra_data = ['True', 'False']
-    dataset = ['Pavia', 'Salinas']
-    for r in ratio:
-        for d in dataset:
-            if d == 'Pavia':
-                for e in extra_data:
-                    main(['--server', '--sampling_fixed', 'True', '--method', 'fixmatch', '--runs', str(2),
-                          '--epochs', str(60), '--dataset', d, '--extra_data', e, '--samples', str(40),
-                          '--unlabeled_ratio', r])
-            else:
-                main(['--server', '--sampling_fixed', 'True', '--method', 'fixmatch', '--runs', str(2),
-                      '--epochs', str(60), '--dataset', d, '--samples', str(40),
-                      '--unlabeled_ratio', r])
+    dataset = ['Pavia', 'Salinas', 'Indian']
+    sampling = ['True', 'False']
+    for m in method:
+        for s in sampling:
+            for d in dataset:
+                if d == 'Pavia':
+                    for e in extra_data:
+                        main(['--server', '--sampling_fixed', s, '--method', m, '--runs', str(2),
+                              '--epochs', str(60), '--dataset', d, '--extra_data', e, '--samples', str(40),
+                              '--run_name', 'method_comparision'])
+                else:
+                    main(['--server', '--sampling_fixed', s, '--method', m, '--runs', str(2),
+                          '--epochs', str(60), '--dataset', d, '--samples', str(40),
+                          '--run_name', 'method_comparision'])
+
     """
     sampling = ['True', 'False']
     extra_data = ['True', 'False']
@@ -174,6 +177,7 @@ if __name__ == '__main__':
             else:
                 main(['--server', '--sampling_fixed', s, '--method', 'mean', '--runs', str(2),
                       '--epochs', str(60), '--dataset', d, '--samples', str(40)])
+    """
     """
     aug = ['none', 'spatial_combinations', 'moving_average', 'spectral_mean', 'pca']
     M = [1, 2, 4, 8, 16]

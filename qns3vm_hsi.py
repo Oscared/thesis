@@ -327,7 +327,8 @@ if __name__ == '__main__':
             folds = 5
 
         avg_acc = np.zeros(folds)
-
+        results = []
+        
         for f in range(0,folds):
             for r in range(runs):
                 result = main(['--dataset', dataset, '--fold', f])
