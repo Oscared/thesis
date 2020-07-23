@@ -60,7 +60,7 @@ def main(raw_args=None):
     else:
         data_path = '/home/oscar/Desktop/Exjobb/Data/ieee_supplement/Hyperspectral_Grids/{}'
 
-    if args.dataset == 'Indian':
+    if args.dataset == 'Indiana':
         folds = 4
     else:
         folds = 5
@@ -69,7 +69,7 @@ def main(raw_args=None):
         data_folder = 'Salinas'
     elif args.dataset == 'Pavia':
         data_folder = 'Pavia University'
-    elif args.dataset == 'Indian':
+    elif args.dataset == 'Indiana':
         data_folder = 'Indian Pines'
     else:
         print('No dataset by right name')
@@ -149,7 +149,7 @@ if __name__ == '__main__':
 
     method = ['fixmatch', 'supervised']
     extra_data = ['True', 'False']
-    dataset = ['Pavia', 'Salinas', 'Indian']
+    dataset = ['Indiana', 'Pavia', 'Salinas']
     sampling = ['True', 'False']
     for m in method:
         for s in sampling:

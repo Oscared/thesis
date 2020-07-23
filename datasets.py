@@ -151,9 +151,7 @@ def get_patch_data(dataset_name, patch_size, target_folder=dataset_path, fold=0)
     if dataset_name not in ['salinas', 'pavia', 'indiana']:
         print('Error: Dataset is not available')
 
-    if dataset_name == 'salinas':
-        remove_files = 3
-    elif dataset_name == 'pavia':
+    if dataset_name == 'pavia':
         remove_files = 4
     else:
         remove_files = 3
@@ -211,6 +209,17 @@ def get_patch_data(dataset_name, patch_size, target_folder=dataset_path, fold=0)
                         "Corn_senesced_green_weeds", "Lettuce_romaine_4wk", "Lettuce_romaine_5wk",
                         "Lettuce_romaine_6wk", "Lettuce_romaine_7wk", "Vinyard_untrained",
                         "Vinyard_vertical_trellis"]
+        ignored_labels = [0]
+
+    elif dataset_name == 'indiana':
+        rgb_bands = (43, 21, 11)  # AVIRIS sensor
+        label_values = ["Undefined", "Alfalfa", "Corn-notill", "Corn-mintill",
+                        "Corn", "Grass-pasture", "Grass-trees",
+                        "Grass-pasture-mowed", "Hay-windrowed", "Oats",
+                        "Soybean-notill", "Soybean-mintill", "Soybean-clean",
+                        "Wheat", "Woods", "Buildings-Grass-Trees-Drives",
+                        "Stone-Steel-Towers"]
+
         ignored_labels = [0]
     else:
         print("Error: no dataset of the requested type found. Available datasets are PaviaU, Salinas.")
