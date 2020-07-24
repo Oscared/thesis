@@ -89,7 +89,12 @@ def main(raw_args=None):
             print('Running: ' + str(r) + 'time and: ' + str(f) + ' fold.')
             if args.method == 'supervised':
                 if args.augment == 'none':
-                    supervised_args = ['--model', args.model, '--class_balancing', '--dataset', args.dataset, '--data_dir', data_path.format(data_folder), '--results', 'results/{}/{}/'.format(args.run_name, args.augment),'--epochs', '{}'.format(args.epochs), '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size), '--fold', '{}'.format(f), '--cuda', '0', '--sampling_fixed', args.sampling_fixed]
+                    supervised_args = ['--model', args.model, '--class_balancing',
+                                       '--dataset', args.dataset, '--data_dir', data_path.format(data_folder),
+                                       '--results', 'results/{}/{}/'.format(args.run_name, args.augment), '--epochs', '{}'.format(args.epochs),
+                                       '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size),
+                                       '--fold', '{}'.format(f), '--cuda', '0', '--sampling_fixed', args.sampling_fixed,
+                                       '--samples_per_class', str(args.samples), '--extra_data', args.extra_data]
                 elif args.augment == 'spatial_combinations':
                     supervised_args = ['--augmentation_magnitude', str(args.M), '--spatial_combinations', '--class_balancing', '--dataset', args.dataset, '--data_dir', data_path.format(data_folder), '--results', 'results/{}/{}/'.format(args.run_name, args.augment),'--epochs', '{}'.format(args.epochs), '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size), '--fold', '{}'.format(f), '--cuda', '0', '--sampling_fixed', args.sampling_fixed]
                 elif args.augment == 'spectral_mean':
@@ -147,7 +152,7 @@ def main(raw_args=None):
 
 if __name__ == '__main__':
 
-    method = ['fixmatch', 'supervised']
+    method = ['mean', 'supervised']
     extra_data = ['True', 'False']
     dataset = ['Indiana', 'Pavia', 'Salinas']
     sampling = ['True', 'False']
@@ -158,11 +163,11 @@ if __name__ == '__main__':
                     for e in extra_data:
                         main(['--server', '--sampling_fixed', s, '--method', m, '--runs', str(2),
                               '--epochs', str(60), '--dataset', d, '--extra_data', e, '--samples', str(40),
-                              '--run_name', 'method_comparision'])
+                              '--run_name', 'method_comparision_mean'])
                 else:
                     main(['--server', '--sampling_fixed', s, '--method', m, '--runs', str(2),
                           '--epochs', str(60), '--dataset', d, '--samples', str(40),
-                          '--run_name', 'method_comparision'])
+                          '--run_name', 'method_comparision_mean'])
 
     """
     sampling = ['True', 'False']
