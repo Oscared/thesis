@@ -151,10 +151,10 @@ def get_patch_data(dataset_name, patch_size, target_folder=dataset_path, fold=0)
     if dataset_name not in ['salinas', 'pavia', 'indiana']:
         print('Error: Dataset is not available')
 
-    if dataset_name == 'pavia':
-        remove_files = 4
-    else:
+    if dataset_name == 'salinas':
         remove_files = 3
+    else:
+        remove_files = 4
 
     for i in (range(int((len(os.listdir(target_folder + '/{}_fold_{}/'.format(dataset_name, fold)))-remove_files)/2))):
         #train_patches[i] = np.load(data_path + '/salinas_fold_0/patch_{}.npy'.format(i))
