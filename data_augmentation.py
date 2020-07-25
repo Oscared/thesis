@@ -105,7 +105,7 @@ def band_combination(self, data, M=1):
                 for i in range(math.ceil(splits)):
                     rand_band = np.random.randint(patch.shape[0])
                     new_image[x,y,int(c*i/splits):int(c*(i+1)/splits)] = patch_bands[rand_band, i, :]
-        return new_image
+    return new_image
 
 def identity(data):
     return data
@@ -116,6 +116,8 @@ def augment_pool_1():
             (spatial_combinations, ),
             (spectral_mean, ),
             (moving_average, ),
+            (spectral_shift, ),
+            (band_combination, ),
             (identity, None, None)]
 
 def augment_pool_2():
@@ -125,7 +127,6 @@ def augment_pool_2():
             (identity, None, None)]
 
 class RandAugment(object):
-
     def __init__(self, n, m, patch_size):
         assert n>=1
         assert 1 <= m <= 10
