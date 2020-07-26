@@ -94,7 +94,7 @@ def main(raw_args=None):
                                        '--results', 'results/{}/{}/'.format(args.run_name, args.augment), '--epochs', '{}'.format(args.epochs),
                                        '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size),
                                        '--fold', '{}'.format(f), '--cuda', '0', '--sampling_fixed', args.sampling_fixed,
-                                       '--samples_per_class', str(args.samples), '--extra_data', args.extra_data]
+                                       '--samples_per_class', str(args.samples)]
                 elif args.augment == 'spatial_combinations':
                     supervised_args = ['--augmentation_magnitude', str(args.M), '--spatial_combinations', '--class_balancing', '--dataset', args.dataset, '--data_dir', data_path.format(data_folder), '--results', 'results/{}/{}/'.format(args.run_name, args.augment),'--epochs', '{}'.format(args.epochs), '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size), '--fold', '{}'.format(f), '--cuda', '0', '--sampling_fixed', args.sampling_fixed]
                 elif args.augment == 'spectral_mean':
