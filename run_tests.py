@@ -152,8 +152,8 @@ def main(raw_args=None):
 
 if __name__ == '__main__':
 
-    method = ['mean', 'supervised']
-    extra_data = ['True', 'False']
+    method = ['supervised']
+    extra_data = ['False']
     dataset = ['Indiana', 'Pavia', 'Salinas']
     sampling = ['True', 'False']
     for m in method:
