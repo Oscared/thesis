@@ -152,9 +152,9 @@ def main(raw_args=None):
 
 if __name__ == '__main__':
 
-    method = ['supervised']
-    extra_data = ['False']
-    dataset = ['Indiana', 'Pavia', 'Salinas']
+    method = ['mean', 'fixmatch', 'supervised']
+    extra_data = ['False', 'True']
+    dataset = ['Pavia', 'Salinas']
     sampling = ['True', 'False']
     for m in method:
         for s in sampling:
@@ -163,11 +163,11 @@ if __name__ == '__main__':
                     for e in extra_data:
                         main(['--server', '--sampling_fixed', s, '--method', m, '--runs', str(2),
                               '--epochs', str(60), '--dataset', d, '--extra_data', e, '--samples', str(40),
-                              '--run_name', 'method_comparision_mean'])
+                              '--run_name', 'method_comparision_1D', '--model', '1D'])
                 else:
                     main(['--server', '--sampling_fixed', s, '--method', m, '--runs', str(2),
                           '--epochs', str(60), '--dataset', d, '--samples', str(40),
-                          '--run_name', 'method_comparision_mean'])
+                          '--run_name', 'method_comparision_1D', '--model', '1D'])
 
     """
     sampling = ['True', 'False']
