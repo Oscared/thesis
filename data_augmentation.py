@@ -1,23 +1,24 @@
 import numpy as np
 from sklearn.decomposition import PCA
 import torch
+import random
+import math
 
-
-def flip(*arrays):
+def flip(data, **kwargs):
     horizontal = np.random.random() > 0.5
     vertical = np.random.random() > 0.5
     if horizontal:
-        arrays = [np.fliplr(arr) for arr in arrays]
+        data = np.fliplr(data)
     if vertical:
-        arrays = [np.flipud(arr) for arr in arrays]
-    return arrays
+        data = np.flip(data, axis=-1)
+    return data
 
-def radiation_noise(data, alpha_range=(0.9, 1.1), beta=1/25):
+def radiation_noise(data, alpha_range=(0.9, 1.1), bias=1/25, **kwargs):
     alpha = np.random.uniform(*alpha_range)
     noise = np.random.normal(loc=0., scale=1.0, size=data.shape)
-    return alpha * data + beta * noise
+    return alpha * data + bias * noise
 
-def cutout_spatial(self, data):
+def cutout_spatial(data, **kwargs):
     cutout_image = np.copy(data)
     x,y = data.shape[:2]
     x_c, y_c = np.random.randint(x, size=2)
@@ -27,7 +28,7 @@ def cutout_spatial(self, data):
         cutout_image[x_c, y_c, :] = 0
         return cutout_image
 
-def spatial_combinations(self, data, M=1):
+def spatial_combinations(data, M=1, **kwargs):
     h, w, c = data.shape
     #Test to see if it is possible to use a magnitude as scaling fator for amount of samples to mix from
     size = 2*M
@@ -52,7 +53,7 @@ def spatial_combinations(self, data, M=1):
                 new_image[x,y,:] = np.dot(np.transpose(patch), alphas)/np.sum(alphas)
     return new_image
 
-def spectral_mean(self, data, M=1):
+def spectral_mean(data, M=1, **kwargs):
     new_data = np.copy(data)
     bands = 4*M
     channels = data.shape[-1]
@@ -63,7 +64,7 @@ def spectral_mean(self, data, M=1):
         for _ in range(new_data[:,:,int(channels*i/chunks):int(channels*(i+1)/chunks)].shape[-1])), axis=2)
     return new_data
 
-def moving_average(self, data, M=1):
+def moving_average(data, M=1, **kwargs):
     new_data = np.copy(data)
     channels = data.shape[-1]
     bands = 2*M
@@ -73,11 +74,11 @@ def moving_average(self, data, M=1):
         new_data[:,:,i] = np.mean(data[:,:,c1:c2], axis=2)
     return new_data
 
-def spectral_shift(self, data, M=1):
+def spectral_shift(data, M=1, **kwargs):
     new_data=np.roll(data, M*2, axis=-1)
     return new_data
 
-def band_combination(self, data, M=1):
+def band_combination(data, M=1, **kwargs):
     h, w, c = data.shape
     #Test to see if it is possible to use a magnitude as scaling fator for amount of samples to mix from
     size = 2*M
@@ -107,24 +108,26 @@ def band_combination(self, data, M=1):
                     new_image[x,y,int(c*i/splits):int(c*(i+1)/splits)] = patch_bands[rand_band, i, :]
     return new_image
 
-def identity(data):
+def identity(data, **kwargs):
     return data
 
 def augment_pool_1():
     augs = [(flip, None, None),
-            (radiation_noise, ),
-            (spatial_combinations, ),
-            (spectral_mean, ),
-            (moving_average, ),
-            (spectral_shift, ),
-            (band_combination, ),
+            (radiation_noise, None, 1/25),
+            (spatial_combinations, None, None),
+            (spectral_mean, None, None),
+            (moving_average, None, None),
+            (spectral_shift, None, None),
+            (band_combination, None, None),
             (identity, None, None)]
+    return augs
 
 def augment_pool_2():
-    augs = [(radiation_noise, ),
-            (spectral_mean, ),
-            (moving_average, ),
+    augs = [(radiation_noise, None, 1/25),
+            (spectral_mean, None, None),
+            (moving_average, None, None),
             (identity, None, None)]
+    return augs
 
 class RandAugment(object):
     def __init__(self, n, m, patch_size):
@@ -141,10 +144,12 @@ class RandAugment(object):
 
     def __call__(self, data):
         ops = random.choices(self.augment_pool, k=self.n)
+        print(ops[0][0])
+        print(ops[1][0])
         for op, max_v, bias in ops:
             v = np.random.randint(1, self.m)
             if random.random() < 0.5:
-                data = op(data, v=v, max_v=max_v, bias=bias)
+                data = op(data, M=v, max_v=max_v, bias=bias)
         if self.patch_size > 1:
             data = cutout_spatial(data)
         return data

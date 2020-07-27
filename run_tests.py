@@ -50,6 +50,15 @@ def main(raw_args=None):
     parser.add_argument('--unlabeled_ratio', type=int, default=7,
                         help='Ratio of unlabeled samples per batch. Defaults to 7.')
 
+    parser.add_argument('--warmup', type=float, default=0,
+                        help='warmup epochs')
+    parser.add_argument('--consistency', type=float, default=100.0,
+                        help='Consistency weight maximum value. Defaults to 100.')
+    parser.add_argument('--consistency_rampup', type=int, default=5,
+                        help='epochs of rampup for consistency? Defaults to 5.')
+    parser.add_argument('--ema_decay', type=float, default=0.95,
+                        help='EMA decay of weights. Defaults to 0.95.')
+
 
     args = parser.parse_args(raw_args)
 
@@ -117,7 +126,9 @@ def main(raw_args=None):
                                 '--batch_size', '{}'.format(args.batch_size), '--fold', '{}'.format(f),
                                 '--cuda', '0', '--sampling_fixed', args.sampling_fixed,
                                 '--extra_data', args.extra_data, '--unlabeled_ratio', str(args.unlabeled_ratio),
-                                '--samples_per_class', str(args.samples), '--model', args.model])
+                                '--samples_per_class', str(args.samples), '--model', args.model,
+                                '--warmup', args.warmup, '--consistency', args.consistency,
+                                '--consistency_rampup', args.consistency_rampup, '--ema_decay', args.ema_decay])
             elif args.method == 'fixmatch':
                 result = fixmatch(['--model', args.model, '--pretrain', str(args.pretrain),
                                    '--augmentation_magnitude', str(args.M), '--class_balancing',
@@ -151,7 +162,7 @@ def main(raw_args=None):
     writer.close()
 
 if __name__ == '__main__':
-
+    """
     method = ['mean', 'fixmatch', 'supervised']
     extra_data = ['False', 'True']
     dataset = ['Pavia', 'Salinas']
@@ -168,7 +179,7 @@ if __name__ == '__main__':
                     main(['--server', '--sampling_fixed', s, '--method', m, '--runs', str(2),
                           '--epochs', str(60), '--dataset', d, '--samples', str(40),
                           '--run_name', 'method_comparision_1D', '--model', '1D'])
-
+    """
     """
     sampling = ['True', 'False']
     extra_data = ['True', 'False']
@@ -207,3 +218,17 @@ if __name__ == '__main__':
     for p in pretrain:
         main(['--server', '--runs', str(3), '--epochs', str(100), '--method', 'fixmatch', '--sampling_fixed', 'True', '--pretrain', p])
     """
+
+    warmup = ['0', '5', '10']
+    consistency = ['80', '100', '120']
+    ramp_up = ['2', '5', '7']
+    decay = ['0.90', '0.95', '0.99']
+    for w in warmup:
+        for c in consistency:
+            for r in ramp_up:
+                for d in decay:
+                    main(['--server', '--sampling_fixed', 'True', '--method', 'mean', '--runs', str(2),
+                          '--epochs', str(60), '--dataset', 'Salinas', '--samples', str(40),
+                          '--run_name', 'mean_param_test', '--warmup', w,
+                          '--consistency', c, '--consistency_rampup', r,
+                          '--ema_decay', d])
