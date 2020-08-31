@@ -127,8 +127,8 @@ def main(raw_args=None):
                                 '--cuda', '0', '--sampling_fixed', args.sampling_fixed,
                                 '--extra_data', args.extra_data, '--unlabeled_ratio', str(args.unlabeled_ratio),
                                 '--samples_per_class', str(args.samples), '--model', args.model,
-                                '--warmup', args.warmup, '--consistency', args.consistency,
-                                '--consistency_rampup', args.consistency_rampup, '--ema_decay', args.ema_decay])
+                                '--warmup', str(args.warmup), '--consistency', str(args.consistency),
+                                '--consistency_rampup', str(args.consistency_rampup), '--ema_decay', str(args.ema_decay)])
             elif args.method == 'fixmatch':
                 result = fixmatch(['--model', args.model, '--pretrain', str(args.pretrain),
                                    '--augmentation_magnitude', str(args.M), '--class_balancing',
