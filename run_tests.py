@@ -219,7 +219,7 @@ if __name__ == '__main__':
         main(['--server', '--runs', str(3), '--epochs', str(100), '--method', 'fixmatch', '--sampling_fixed', 'True', '--pretrain', p])
     """
 
-    warmup = ['0', '5', '10']
+    warmup = ['5', '10']
     consistency = ['80', '100', '120']
     ramp_up = ['2', '5', '7']
     decay = ['0.90', '0.95', '0.99']
