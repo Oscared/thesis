@@ -1,6 +1,5 @@
 import numpy as np
 from sklearn.decomposition import PCA
-import torch
 import random
 import math
 
@@ -10,7 +9,7 @@ def flip(data, **kwargs):
     if horizontal:
         data = np.fliplr(data)
     if vertical:
-        data = np.flip(data, axis=-1)
+        data = np.flipud(data)
     return data
 
 def radiation_noise(data, alpha_range=(0.9, 1.1), bias=1/25, **kwargs):
@@ -84,6 +83,7 @@ def band_combination(data, M=1, **kwargs):
     size = 2*M
     new_image = np.zeros_like(data)
     splits = c/(M*4)
+    splits_round = math.ceil(splits)
     for x in range(h):
         for y in range(w):
             x1 = np.clip(x - size // 2, 0, h)
@@ -97,15 +97,17 @@ def band_combination(data, M=1, **kwargs):
                 if np.sum(patch[p,:])==0:
                     delete_idx.append(p)
             patch = np.delete(patch, delete_idx, 0)
-            patch_bands = np.zeros((patch.shape[0], math.ceil(splits), 4*M))
-            for i in range(math.ceil(splits)):
+            patch_bands = np.zeros((patch.shape[0], splits_round, 4*M))
+            for i in range(splits_round - 1):
                 patch_bands[:, i, :] = patch[:,int(c*i/splits):int(c*(i+1)/splits)]
-            if patch.shape[0] == 0:
+            patch_bands[:, splits_round-1, :] = np.concatenate((patch[:, int(c*(splits_round-1)/splits):], np.zeros((patch.shape[0], int(splits_round*4*M - c)))), axis=1)
+            if patch.shape[0]==0 or np.sum(data[x,y,:])==0:
                 new_image[x,y,:] = 0
             else:
-                for i in range(math.ceil(splits)):
+                for i in range(splits_round - 1):
                     rand_band = np.random.randint(patch.shape[0])
                     new_image[x,y,int(c*i/splits):int(c*(i+1)/splits)] = patch_bands[rand_band, i, :]
+                new_image[x,y,int(c*(splits_round-1)/splits):] = patch_bands[rand_band,splits_round-1, :int(c-4*M*(splits_round-1))]
     return new_image
 
 def identity(data, **kwargs):
@@ -126,6 +128,7 @@ def augment_pool_2():
     augs = [(radiation_noise, None, 1/25),
             (spectral_mean, None, None),
             (moving_average, None, None),
+            (spectral_shift, None, None),
             (identity, None, None)]
     return augs
 
@@ -143,13 +146,17 @@ class RandAugment(object):
             self.augment_pool = augment_pool_2()
 
     def __call__(self, data):
+        if self.patch_size == 1:
+            data = np.reshape(data, (1,1,data.shape[0]))
         ops = random.choices(self.augment_pool, k=self.n)
-        print(ops[0][0])
-        print(ops[1][0])
+        #print(ops[0][0])
+        #print(ops[1][0])
         for op, max_v, bias in ops:
-            v = np.random.randint(1, self.m)
+            v = np.random.randint(1, self.m+1)
             if random.random() < 0.5:
                 data = op(data, M=v, max_v=max_v, bias=bias)
         if self.patch_size > 1:
             data = cutout_spatial(data)
+        else:
+            data = np.reshape(data, (data.shape[2],))
         return data

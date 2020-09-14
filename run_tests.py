@@ -39,8 +39,12 @@ def main(raw_args=None):
                         help='Strength of PCA augmentation')
     parser.add_argument('--augment', type=str, default='none',
                         help='augmentations')
-    parser.add_argument('--M', type=int, default=10,
-                        help='M')
+
+    parser.add_argument('--n', type=int, default=0,
+                        help='Amount of augmentations')
+    parser.add_argument('--M', type=int, default=2,
+                        help='Strength of augmentations')
+
     parser.add_argument('--pretrain', type=int, default=0,
                         help='pretrain epochs')
     parser.add_argument('--extra_data', type=str, default='True',
@@ -101,6 +105,16 @@ def main(raw_args=None):
                     supervised_args = ['--model', args.model, '--class_balancing',
                                        '--dataset', args.dataset, '--data_dir', data_path.format(data_folder),
                                        '--results', 'results/{}/{}/'.format(args.run_name, args.augment), '--epochs', '{}'.format(args.epochs),
+                                       '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size),
+                                       '--fold', '{}'.format(f), '--cuda', '0', '--sampling_fixed', args.sampling_fixed,
+                                       '--samples_per_class', str(args.samples)]
+
+                elif args.augment == 'rand':
+                    supervised_args = ['--model', args.model, '--class_balancing',
+                                       '--dataset', args.dataset, '--data_dir', data_path.format(data_folder),
+                                       '--results', 'results/{}/{}/{}/{}'.format(args.run_name, args.augment, args.n, args.M),
+                                       '--epochs', '{}'.format(args.epochs), '--augmentation_amount', str(args.n),
+                                       '--augmentation_magnitude', str(args.M),
                                        '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size),
                                        '--fold', '{}'.format(f), '--cuda', '0', '--sampling_fixed', args.sampling_fixed,
                                        '--samples_per_class', str(args.samples)]
@@ -194,13 +208,15 @@ if __name__ == '__main__':
                 main(['--server', '--sampling_fixed', s, '--method', 'mean', '--runs', str(2),
                       '--epochs', str(60), '--dataset', d, '--samples', str(40)])
     """
-    """
-    aug = ['none', 'spatial_combinations', 'moving_average', 'spectral_mean', 'pca']
-    M = [1, 2, 4, 8, 16]
-    for c in aug:
+
+    #aug = ['none', 'spatial_combinations', 'moving_average', 'spectral_mean', 'pca']
+    N = [1, 2, 4, 8]
+    M = [1, 2, 4, 8]
+    for n in N:
         for m in M:
-            main(['--server', '--runs', str(2), '--augment', c, '--epochs', '80', '--M', str(m)])
-    """
+            main(['--server', '--runs', str(2), '--augment', 'rand', '--epochs',
+                  '60', '--n', str(n), '--M', str(m), '--run_name', 'rand_aug_test'])
+
 
     """
     fixed_sampling = ['False', 'True']
@@ -219,6 +235,7 @@ if __name__ == '__main__':
         main(['--server', '--runs', str(3), '--epochs', str(100), '--method', 'fixmatch', '--sampling_fixed', 'True', '--pretrain', p])
     """
 
+    """ Good param is warmup 0, consistency 100, ramp_up 5, decay 0.9 for example
     warmup = ['5', '10']
     consistency = ['80', '100', '120']
     ramp_up = ['2', '5', '7']
@@ -232,3 +249,4 @@ if __name__ == '__main__':
                           '--run_name', 'mean_param_test', '--warmup', w,
                           '--consistency', c, '--consistency_rampup', r,
                           '--ema_decay', d])
+    """

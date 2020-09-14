@@ -13,6 +13,7 @@ from sklearn import preprocessing
 from sklearn.decomposition import PCA
 import utils
 import math
+from data_augmentation import RandAugment
 
 try:
     # Python 3
@@ -539,10 +540,14 @@ class HyperX_patches(torch.utils.data.Dataset):
         self.pca_strength = args['pca_strength']
         self.spatial_cutout_aug = args['cutout_spatial']
         self.spectral_cutout_aug = args['cutout_spectral']
-        self.M = args['augmentation_magnitude']
         self.spatial_comb = args['spatial_combinations']
         self.mean_spectral = args['spectral_mean']
         self.spectral_mvavg = args['moving_average']
+
+        self.n = args['augmentation_amount']
+        self.M = args['augmentation_magnitude']
+
+        self.rand_aug = RandAugment(self.n, self.M, self.patch_size)
 
         self.center_pixel = args['center_pixel']
         self.labeled = labeled
@@ -780,6 +785,8 @@ class HyperX_patches(torch.utils.data.Dataset):
             if self.spectral_mvavg and np.random.random() < 0.5:
                 data = self.moving_average(data, self.M)
 
+            if self.n > 0:
+                data = self.rand_aug(data)
 
             # Copy the data into numpy arrays (PyTorch doesn't like numpy views)
             data = np.asarray(np.copy(data).transpose((2, 0, 1)), dtype='float32')
