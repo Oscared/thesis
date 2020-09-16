@@ -210,13 +210,19 @@ if __name__ == '__main__':
     """
 
     #aug = ['none', 'spatial_combinations', 'moving_average', 'spectral_mean', 'pca']
-    N = [1, 2, 4, 8]
-    M = [1, 2, 4, 8]
+    N = [1]
+    M = [6, 10]
     for n in N:
         for m in M:
             main(['--server', '--runs', str(2), '--augment', 'rand', '--epochs',
                   '60', '--n', str(n), '--M', str(m), '--run_name', 'rand_aug_test'])
 
+    N = [3]
+    M = [1, 2, 3]
+    for n in N:
+        for m in M:
+            main(['--server', '--runs', str(2), '--augment', 'rand', '--epochs',
+                  '60', '--n', str(n), '--M', str(m), '--run_name', 'rand_aug_test'])
 
     """
     fixed_sampling = ['False', 'True']
