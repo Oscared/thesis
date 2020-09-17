@@ -218,14 +218,14 @@ if __name__ == '__main__':
         for m in M:
             main(['--server', '--method', 'fixmatch', '--runs', str(2), '--epochs',
                   '60', '--n', str(n), '--M', str(m), '--run_name', 'fixmatch_rand_aug/{}/{}'.format(n,m),
-                  '--sampling_fixed', 'True'])
+                  '--sampling_fixed', 'True', '--samples', str(40)])
     N = [1]
     M = [6, 10]
     for n in N:
         for m in M:
             main(['--server', '--method', 'mean', '--runs', str(2), '--epochs',
                   '60', '--n', str(n), '--M', str(m), '--run_name', 'mean_rand_aug/{}/{}'.format(n,m),
-                  '--sampling_fixed', 'True'])
+                  '--sampling_fixed', 'True', '--samples', str(40)])
 
     """
     fixed_sampling = ['False', 'True']
