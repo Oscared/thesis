@@ -45,7 +45,7 @@ def main(raw_args=None):
                         help='Consistency weight maximum value. Defaults to 100.')
     parser.add_argument('--consistency_rampup', type=int, default=5,
                         help='epochs of rampup for consistency? Defaults to 5.')
-    parser.add_argument('--ema_decay', type=float, default=0.95,
+    parser.add_argument('--ema_decay', type=float, default=0.9,
                         help='EMA decay of weights. Defaults to 0.95.')
 
     parser.add_argument('--save', action='store_true',

@@ -142,10 +142,12 @@ def main(raw_args=None):
                                 '--extra_data', args.extra_data, '--unlabeled_ratio', str(args.unlabeled_ratio),
                                 '--samples_per_class', str(args.samples), '--model', args.model,
                                 '--warmup', str(args.warmup), '--consistency', str(args.consistency),
-                                '--consistency_rampup', str(args.consistency_rampup), '--ema_decay', str(args.ema_decay)])
+                                '--consistency_rampup', str(args.consistency_rampup), '--ema_decay', str(args.ema_decay),
+                                '--augmentation_magnitude', str(args.M), '--augmentation_amount', str(args.n)])
             elif args.method == 'fixmatch':
                 result = fixmatch(['--model', args.model, '--pretrain', str(args.pretrain),
-                                   '--augmentation_magnitude', str(args.M), '--class_balancing',
+                                   '--augmentation_magnitude', str(args.M), '--augmentation_amount', str(args.n),
+                                   '--class_balancing', '--flip_augmentation',
                                    '--dataset', args.dataset, '--data_dir', data_path.format(data_folder),
                                    '--results', 'results/{}/{}'.format(args.run_name, str(args.samples)),'--epochs', '{}'.format(args.epochs),
                                    '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size),
@@ -194,7 +196,7 @@ if __name__ == '__main__':
                           '--epochs', str(60), '--dataset', d, '--samples', str(40),
                           '--run_name', 'method_comparision_1D', '--model', '1D'])
     """
-    """
+    """ KÖR SEN
     sampling = ['True', 'False']
     extra_data = ['True', 'False']
     dataset = ['Pavia', 'Salinas']
@@ -210,19 +212,20 @@ if __name__ == '__main__':
     """
 
     #aug = ['none', 'spatial_combinations', 'moving_average', 'spectral_mean', 'pca']
+    N = [1,2,4]
+    M = [6, 8, 10]
+    for n in N:
+        for m in M:
+            main(['--server', '--method', 'fixmatch', '--runs', str(2), '--epochs',
+                  '60', '--n', str(n), '--M', str(m), '--run_name', 'fixmatch_rand_aug/{}/{}'.format(n,m),
+                  '--sampling_fixed', 'True'])
     N = [1]
     M = [6, 10]
     for n in N:
         for m in M:
-            main(['--server', '--runs', str(2), '--augment', 'rand', '--epochs',
-                  '60', '--n', str(n), '--M', str(m), '--run_name', 'rand_aug_test'])
-
-    N = [3]
-    M = [1, 2, 3]
-    for n in N:
-        for m in M:
-            main(['--server', '--runs', str(2), '--augment', 'rand', '--epochs',
-                  '60', '--n', str(n), '--M', str(m), '--run_name', 'rand_aug_test'])
+            main(['--server', '--method', 'mean', '--runs', str(2), '--epochs',
+                  '60', '--n', str(n), '--M', str(m), '--run_name', 'mean_rand_aug/{}/{}'.format(n,m),
+                  '--sampling_fixed', 'True'])
 
     """
     fixed_sampling = ['False', 'True']
