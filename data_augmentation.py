@@ -114,8 +114,7 @@ def identity(data, **kwargs):
     return data
 
 def augment_pool_1():
-    augs = [(flip, None, None),
-            (radiation_noise, None, 1/25),
+    augs = [(radiation_noise, None, 1/25),
             (spatial_combinations, None, None),
             (spectral_mean, None, None),
             (moving_average, None, None),
