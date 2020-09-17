@@ -883,7 +883,7 @@ class HyperX_patches(torch.utils.data.Dataset):
             """
 
             #data_weak = self.flip(data_weak)
-            data_strong = self.rand_aug(data_strong)
+            data_strong = self.rand_aug(np.asarray(data_strong))
             # Copy the data into numpy arrays (PyTorch doesn't like numpy views)
             data_weak = np.asarray(np.copy(data_weak).transpose((2, 0, 1)), dtype='float32')
 
@@ -949,8 +949,8 @@ class HyperX_patches(torch.utils.data.Dataset):
             data_weak = self.cutout_spatial(data_weak)
             """
 
-            data_strong = self.rand_aug(data_strong)
-            data_weak = self.rand_aug(data_weak)
+            data_strong = self.rand_aug(np.asarray(data_strong))
+            data_weak = self.rand_aug(np.asarray(data_weak))
 
             # Copy the data into numpy arrays (PyTorch doesn't like numpy views)
             data_weak = np.asarray(np.copy(data_weak).transpose((2, 0, 1)), dtype='float32')
