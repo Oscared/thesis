@@ -854,6 +854,8 @@ class HyperX_patches(torch.utils.data.Dataset):
 
             data_weak = self.data[p, x1:x2, y1:y2]
             data_strong = np.copy(data_weak)
+            #print('Shape of original data')
+            #print(data_strong.shape)
             #This will currently not work with data that has no labels, it doesnt harm it right now either though...
             # i.e. it is a zero matrix
             #label_weak = self.label[p, x1:x2, y1:y2]
@@ -863,8 +865,10 @@ class HyperX_patches(torch.utils.data.Dataset):
                 # Perform data augmentation (only on 2D patches)
                 #data_weak, label_weak = self.flip(data_weak, label_weak)
                 #data_strong, label_strong = self.flip(data_strong, label_strong)
-                data_weak = self.flip(data_weak)
-                data_strong = self.flip(data_strong)
+                data_weak = self.flip(data_weak)[0]
+                data_strong = self.flip(data_strong)[0]
+                #print('Shape after flip')
+                #print(np.array(data_weak).shape)
             """
             if np.random.rand() < 0.5:
                 data_strong = self.radiation_noise(data_strong)
@@ -883,7 +887,10 @@ class HyperX_patches(torch.utils.data.Dataset):
             """
 
             #data_weak = self.flip(data_weak)
-            data_strong = self.rand_aug(np.asarray(data_strong))
+            data_strong = self.rand_aug(np.array(data_strong))
+            #print('Shape after rand aug')
+            #print(data_strong.shape)
+            #print(np.array(data_weak).shape)
             # Copy the data into numpy arrays (PyTorch doesn't like numpy views)
             data_weak = np.asarray(np.copy(data_weak).transpose((2, 0, 1)), dtype='float32')
 
