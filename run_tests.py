@@ -212,15 +212,15 @@ if __name__ == '__main__':
     """
 
     #aug = ['none', 'spatial_combinations', 'moving_average', 'spectral_mean', 'pca']
-    N = [1,2,4]
-    M = [6, 8, 10]
+    N = [1,2,3]
+    M = [2,4,7]
     for n in N:
         for m in M:
             main(['--server', '--method', 'fixmatch', '--runs', str(2), '--epochs',
                   '60', '--n', str(n), '--M', str(m), '--run_name', 'fixmatch_rand_aug/{}/{}'.format(n,m),
                   '--sampling_fixed', 'True', '--samples', str(40)])
-    N = [1]
-    M = [6, 10]
+    N = [1,2,4]
+    M = [1,4,6]
     for n in N:
         for m in M:
             main(['--server', '--method', 'mean', '--runs', str(2), '--epochs',
