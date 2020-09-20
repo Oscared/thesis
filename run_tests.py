@@ -210,7 +210,7 @@ if __name__ == '__main__':
                 main(['--server', '--sampling_fixed', s, '--method', 'mean', '--runs', str(2),
                       '--epochs', str(60), '--dataset', d, '--samples', str(40)])
     """
-
+    """
     #aug = ['none', 'spatial_combinations', 'moving_average', 'spectral_mean', 'pca']
     N = [1,2,3]
     M = [2,4,7]
@@ -226,7 +226,7 @@ if __name__ == '__main__':
             main(['--server', '--method', 'mean', '--runs', str(2), '--epochs',
                   '60', '--n', str(n), '--M', str(m), '--run_name', 'mean_rand_aug/{}/{}'.format(n,m),
                   '--sampling_fixed', 'True', '--samples', str(40)])
-
+    """
     """
     fixed_sampling = ['False', 'True']
     M = [2, 6, 10, 14]
@@ -244,18 +244,16 @@ if __name__ == '__main__':
         main(['--server', '--runs', str(3), '--epochs', str(100), '--method', 'fixmatch', '--sampling_fixed', 'True', '--pretrain', p])
     """
 
-    """ Good param is warmup 0, consistency 100, ramp_up 5, decay 0.9 for example
-    warmup = ['5', '10']
-    consistency = ['80', '100', '120']
-    ramp_up = ['2', '5', '7']
-    decay = ['0.90', '0.95', '0.99']
+    # Good param is warmup 0, consistency 100, ramp_up 5, decay 0.9 for example
+    warmup = ['0', '2']
+    decay = ['0.90', '0.92', '0.95']
+    n=1
+    m=2
     for w in warmup:
-        for c in consistency:
-            for r in ramp_up:
-                for d in decay:
-                    main(['--server', '--sampling_fixed', 'True', '--method', 'mean', '--runs', str(2),
-                          '--epochs', str(60), '--dataset', 'Salinas', '--samples', str(40),
-                          '--run_name', 'mean_param_test', '--warmup', w,
-                          '--consistency', c, '--consistency_rampup', r,
-                          '--ema_decay', d])
-    """
+        for d in decay:
+            main(['--server', '--sampling_fixed', 'True', '--method', 'mean', '--runs', str(2),
+                  '--epochs', str(60), '--dataset', 'Salinas', '--samples', str(40),
+                  '--n', str(n), '--M', str(m), '--run_name', 'mean_rand_aug/{}/{}'.format(n,m),
+                  '--warmup', w,
+                  '--consistency', c, '--consistency_rampup', r,
+                  '--ema_decay', d])

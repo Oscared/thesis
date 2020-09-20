@@ -131,6 +131,13 @@ def augment_pool_2():
             (identity, None, None)]
     return augs
 
+def augment_pool_mean():
+    augs = [(radiation_noise, None, 1/25),
+            (spatial_combinations, None, None),
+            (identity, None, None)]
+    return augs
+
+
 class RandAugment(object):
     def __init__(self, n, m, patch_size):
         assert n>=1
@@ -140,7 +147,7 @@ class RandAugment(object):
         self.m = m
         self.patch_size = patch_size
         if self.patch_size > 1:
-            self.augment_pool = augment_pool_1()
+            self.augment_pool = augment_pool_mean()
         else:
             self.augment_pool = augment_pool_2()
 
