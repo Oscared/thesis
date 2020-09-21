@@ -352,9 +352,9 @@ def main(raw_args=None):
         pass
 
     if args.sampling_mode=='nalepa':
-        probabilities = test(model, test_img, args)
+        probabilities = test(ema_model, test_img, args)
     else:
-        probabilities = test(model, img, args)
+        probabilities = test(ema_model, img, args)
 
     prediction = np.argmax(probabilities, axis=-1)
 

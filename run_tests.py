@@ -253,7 +253,7 @@ if __name__ == '__main__':
         for d in decay:
             main(['--server', '--sampling_fixed', 'True', '--method', 'mean', '--runs', str(2),
                   '--epochs', str(60), '--dataset', 'Salinas', '--samples', str(40),
-                  '--n', str(n), '--M', str(m), '--run_name', 'mean_rand_aug/{}/{}'.format(n,m),
+                  '--n', str(n), '--M', str(m), '--run_name', 'mean_rand_aug_w_d_param/{}/{}'.format(n,m),
                   '--warmup', w,
-                  '--consistency', c, '--consistency_rampup', r,
+                  '--consistency', '100', '--consistency_rampup', '5',
                   '--ema_decay', d])
