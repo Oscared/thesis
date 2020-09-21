@@ -243,8 +243,16 @@ if __name__ == '__main__':
     for p in pretrain:
         main(['--server', '--runs', str(3), '--epochs', str(100), '--method', 'fixmatch', '--sampling_fixed', 'True', '--pretrain', p])
     """
+    n=1
+    m=2
+    fixed_sampling = ['False', 'True']
+    for f in fixed_sampling:
+        main(['--server', '--sampling_fixed', 'True', '--method', 'mean', '--runs', str(2),
+              '--epochs', str(60), '--dataset', 'Salinas', '--samples', str(40),
+              '--n', str(n), '--M', str(m), '--run_name', 'new_mean'])
 
-    # Good param is warmup 0, consistency 100, ramp_up 5, decay 0.9 for example
+    """
+    # Good param is warmup 2, consistency 100, ramp_up 5, decay 0.9 for example
     warmup = ['0', '2']
     decay = ['0.90', '0.92', '0.95']
     n=1
@@ -257,3 +265,4 @@ if __name__ == '__main__':
                   '--warmup', w,
                   '--consistency', '100', '--consistency_rampup', '5',
                   '--ema_decay', d])
+    """

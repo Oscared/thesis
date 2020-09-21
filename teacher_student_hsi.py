@@ -39,7 +39,7 @@ def main(raw_args=None):
                         help='Name of dataset to run, Salinas or PaviaU')
     parser.add_argument('--cuda', type=int, default=-1,
                         help='what CUDA device to run on, -1 defaults to cpu')
-    parser.add_argument('--warmup', type=float, default=0,
+    parser.add_argument('--warmup', type=float, default=2,
                         help='warmup epochs')
     parser.add_argument('--consistency', type=float, default=100.0,
                         help='Consistency weight maximum value. Defaults to 100.')
@@ -324,7 +324,7 @@ def main(raw_args=None):
 
     args.weights = args.weights.to(args.device)
     class_loss = nn.CrossEntropyLoss(weight=args.weights, size_average=False)
-    consistency_loss = softmax_mse_loss
+    consistency_loss = softmax_mse_loss()
     loss_val = nn.CrossEntropyLoss(weight=args.weights)
 
     print(args)
@@ -451,13 +451,20 @@ def train(model, ema_model, optimizer, criterion_labeled, criterion_consistency,
             logits_x = model(inputs_x)
             logits_model = model(inputs_model)
 
+            logits_target_ema = ema_model(inputs_x)
             logits_ema = ema_model(inputs_ema)
+            logits_target_ema = Variable(logits_target_ema.detach().data, requires_grad=False)
             logits_ema = Variable(logits_ema.detach().data, requires_grad=False)
 
             Lx = criterion_labeled(logits_x, targets_x)/args.batch_size
 
+            logits_model = torch.cat((logits_x, logits_model),0)
+            logits_ema = torch.cat((logits_target_ema, logits_ema),0)
+
             consistency_weight = get_consistency_weight(e, args)
-            Lc = consistency_weight*criterion_consistency(logits_model, logits_ema)/args.batch_size
+            Lc = consistency_weight*criterion_consistency(logits_model, logits_ema)/(args.batch_size*(args.unlabeled_ratio+1))
+
+            Lx = torch.cat((Lx, torch.zeros(args.batch_size*args.unlabeled_ratio)),0)
 
             if e < args.pretrain:
                 loss = Lx
