@@ -323,7 +323,7 @@ def main(raw_args=None):
         args.weights = weights
 
     args.weights = args.weights.to(args.device)
-    class_loss = nn.CrossEntropyLoss(weight=args.weights, size_average=False, ignored_index=20)
+    class_loss = nn.CrossEntropyLoss(weight=args.weights, size_average=False, ignore_index=20)
     consistency_loss = softmax_mse_loss
     loss_val = nn.CrossEntropyLoss(weight=args.weights)
 
@@ -454,17 +454,24 @@ def train(model, ema_model, optimizer, criterion_labeled, criterion_consistency,
             logits_ema = ema_model(inputs_ema)
             logits_target_ema = Variable(logits_target_ema.detach().data, requires_grad=False)
             logits_ema = Variable(logits_ema.detach().data, requires_grad=False)
-
+            #print('Student model input size')
+            #print(logits_model.shape)
+            logits_model = torch.cat((logits_x, logits_model),0)
             #Reshape the classification logits and targets so we get the same size
             #but ignore the gradient update on the unlabeled samples (the second part)
-            targets_x = torch.cat((targets_x, 20*torch.ones(args.batch_size*args.unlabeled_ratio)),0)
-            logits_x = torch.cat((logits_x, torch.ones(logits_ema.shape)),0)
+            targets_x = torch.cat((targets_x, 20*torch.ones(args.batch_size*args.unlabeled_ratio, dtype=torch.long, device=args.device)),0)
+            logits_x = torch.cat((logits_x, torch.ones(logits_ema.shape, dtype=torch.float, device=args.device)),0)
 
             Lx = criterion_labeled(logits_x, targets_x)/args.batch_size
 
-            logits_model = torch.cat((logits_x, logits_model),0)
+            #logits_model = torch.cat((logits_x, logits_model),0)
             logits_ema = torch.cat((logits_target_ema, logits_ema),0)
 
+            #print(targets_x.shape)
+            #print(logits_x.shape)
+            #print(logits_model.shape)
+            #print(logits_ema.shape)
+            
             consistency_weight = get_consistency_weight(e, args)
             Lc = consistency_weight*softmax_mse_loss(logits_model, logits_ema)/(args.batch_size*(args.unlabeled_ratio+1))
 
