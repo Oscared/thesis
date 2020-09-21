@@ -89,7 +89,7 @@ def main(raw_args=None):
     parser.add_argument('--moving_average', action='store_true',
                         help='use to sprectral moving average for data augmentation')
 
-    parser.add_argument('--augmentation_magnitude', type=int, default=1,
+    parser.add_argument('--augmentation_magnitude', type=int, default=2,
                         help='Magnitude of augmentation (so far only for cutout). Defualts to 1, min 1 and max 10.')
     parser.add_argument('--augmentation_amount', type=int, default=1,
                         help='amount of augmentation (so far only for cutout). Defualts to 1, min 1 and max 10.')
@@ -471,7 +471,7 @@ def train(model, ema_model, optimizer, criterion_labeled, criterion_consistency,
             #print(logits_x.shape)
             #print(logits_model.shape)
             #print(logits_ema.shape)
-            
+
             consistency_weight = get_consistency_weight(e, args)
             Lc = consistency_weight*softmax_mse_loss(logits_model, logits_ema)/(args.batch_size*(args.unlabeled_ratio+1))
 

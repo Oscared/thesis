@@ -196,7 +196,7 @@ if __name__ == '__main__':
                           '--epochs', str(60), '--dataset', d, '--samples', str(40),
                           '--run_name', 'method_comparision_1D', '--model', '1D'])
     """
-    """ KÖR SEN
+
     sampling = ['True', 'False']
     extra_data = ['True', 'False']
     dataset = ['Pavia', 'Salinas']
@@ -209,7 +209,7 @@ if __name__ == '__main__':
             else:
                 main(['--server', '--sampling_fixed', s, '--method', 'mean', '--runs', str(2),
                       '--epochs', str(60), '--dataset', d, '--samples', str(40)])
-    """
+    
     """
     #aug = ['none', 'spatial_combinations', 'moving_average', 'spectral_mean', 'pca']
     N = [1,2,3]
@@ -243,14 +243,15 @@ if __name__ == '__main__':
     for p in pretrain:
         main(['--server', '--runs', str(3), '--epochs', str(100), '--method', 'fixmatch', '--sampling_fixed', 'True', '--pretrain', p])
     """
+    """
     n=1
     m=2
     fixed_sampling = ['False', 'True']
     for f in fixed_sampling:
-        main(['--server', '--sampling_fixed', 'True', '--method', 'mean', '--runs', str(2),
+        main(['--server', '--sampling_fixed', f, '--method', 'mean', '--runs', str(2),
               '--epochs', str(60), '--dataset', 'Salinas', '--samples', str(40),
               '--n', str(n), '--M', str(m), '--run_name', 'new_mean'])
-
+    """
     """
     # Good param is warmup 2, consistency 100, ramp_up 5, decay 0.9 for example
     warmup = ['0', '2']
