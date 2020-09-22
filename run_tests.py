@@ -200,16 +200,20 @@ if __name__ == '__main__':
     sampling = ['True', 'False']
     extra_data = ['True', 'False']
     dataset = ['Pavia', 'Salinas']
-    for s in sampling:
-        for d in dataset:
-            if d == 'Pavia':
-                for e in extra_data:
+    model = ['1D', '3D']
+    for m in model:
+        for s in sampling:
+            for d in dataset:
+                if d == 'Pavia':
+                    for e in extra_data:
+                        main(['--server', '--sampling_fixed', s, '--method', 'mean', '--runs', str(2),
+                              '--epochs', str(60), '--dataset', d, '--extra_data', e, '--samples', str(40),
+                               '--run_name', 'best_mean/{}/{}/{}/extra_{}/'.format(m,s,d,e), '--model', m])
+                else:
                     main(['--server', '--sampling_fixed', s, '--method', 'mean', '--runs', str(2),
-                          '--epochs', str(60), '--dataset', d, '--extra_data', e, '--samples', str(40), '--run_name', 'best_mean/{}/{}/'.format(s,d)])
-            else:
-                main(['--server', '--sampling_fixed', s, '--method', 'mean', '--runs', str(2),
-                      '--epochs', str(60), '--dataset', d, '--samples', str(40), '--run_name', 'best_mean/{}/{}/'.format(s,d)])
-    
+                          '--epochs', str(60), '--dataset', d, '--samples', str(40),
+                          '--run_name', 'best_mean/{}/{}/{}/'.format(m,s,d), '--model', m])
+
     """
     #aug = ['none', 'spatial_combinations', 'moving_average', 'spectral_mean', 'pca']
     N = [1,2,3]
