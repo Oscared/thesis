@@ -40,7 +40,7 @@ def main(raw_args=None):
     parser.add_argument('--augment', type=str, default='none',
                         help='augmentations')
 
-    parser.add_argument('--n', type=int, default=0,
+    parser.add_argument('--n', type=int, default=1,
                         help='Amount of augmentations')
     parser.add_argument('--M', type=int, default=2,
                         help='Strength of augmentations')
@@ -205,10 +205,10 @@ if __name__ == '__main__':
             if d == 'Pavia':
                 for e in extra_data:
                     main(['--server', '--sampling_fixed', s, '--method', 'mean', '--runs', str(2),
-                          '--epochs', str(60), '--dataset', d, '--extra_data', e, '--samples', str(40)])
+                          '--epochs', str(60), '--dataset', d, '--extra_data', e, '--samples', str(40), '--run_name', 'best_mean/{}/{}/'.format(s,d)])
             else:
                 main(['--server', '--sampling_fixed', s, '--method', 'mean', '--runs', str(2),
-                      '--epochs', str(60), '--dataset', d, '--samples', str(40)])
+                      '--epochs', str(60), '--dataset', d, '--samples', str(40), '--run_name', 'best_mean/{}/{}/'.format(s,d)])
     
     """
     #aug = ['none', 'spatial_combinations', 'moving_average', 'spectral_mean', 'pca']
