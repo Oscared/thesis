@@ -152,8 +152,9 @@ class RandAugment(object):
             self.augment_pool = augment_pool_2()
 
     def __call__(self, data):
-        if self.patch_size == 1:
-            data = np.reshape(data, (1,1,data.shape[0]))
+        #print(data.shape)
+        #if self.patch_size == 1:
+            #data = np.reshape(data, (1,1,data.shape[0]))
         ops = random.choices(self.augment_pool, k=self.n)
         #print(ops[0][0])
         #print(ops[1][0])
@@ -163,6 +164,6 @@ class RandAugment(object):
                 data = op(data, M=v, max_v=max_v, bias=bias)
         if self.patch_size > 1:
             data = cutout_spatial(data)
-        else:
-            data = np.reshape(data, (data.shape[2],))
+        #else:
+            #data = np.reshape(data, (data.shape[2],))
         return data
