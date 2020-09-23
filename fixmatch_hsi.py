@@ -82,9 +82,9 @@ def main(raw_args=None):
     parser.add_argument('--moving_average', action='store_true',
                         help='use to sprectral moving average for data augmentation')
 
-    parser.add_argument('--augmentation_magnitude', type=int, default=1,
+    parser.add_argument('--augmentation_magnitude', type=int, default=3,
                         help='Magnitude of augmentation (so far only for cutout). Defualts to 1, min 1 and max 10.')
-    parser.add_argument('--augmentation_amount', type=int, default=1,
+    parser.add_argument('--augmentation_amount', type=int, default=2,
                         help='amount of augmentation (so far only for cutout). Defualts to 1, min 1 and max 10.')
 
 

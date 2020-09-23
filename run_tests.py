@@ -40,7 +40,7 @@ def main(raw_args=None):
     parser.add_argument('--augment', type=str, default='none',
                         help='augmentations')
 
-    parser.add_argument('--n', type=int, default=1,
+    parser.add_argument('--n', type=int, default=3,
                         help='Amount of augmentations')
     parser.add_argument('--M', type=int, default=2,
                         help='Strength of augmentations')
@@ -206,13 +206,24 @@ if __name__ == '__main__':
             for d in dataset:
                 if d == 'Pavia':
                     for e in extra_data:
-                        main(['--server', '--sampling_fixed', s, '--method', 'mean', '--runs', str(2),
+                        main(['--server', '--sampling_fixed', s, '--method', 'fixmatch', '--runs', str(2),
                               '--epochs', str(60), '--dataset', d, '--extra_data', e, '--samples', str(40),
-                               '--run_name', 'best_mean/{}/{}/{}/extra_{}/'.format(m,s,d,e), '--model', m])
+                               '--run_name', 'best_fixmatch/{}/{}/{}/extra_{}/'.format(m,s,d,e), '--model', m])
                 else:
-                    main(['--server', '--sampling_fixed', s, '--method', 'mean', '--runs', str(2),
+                    main(['--server', '--sampling_fixed', s, '--method', 'fixmatch', '--runs', str(2),
                           '--epochs', str(60), '--dataset', d, '--samples', str(40),
-                          '--run_name', 'best_mean/{}/{}/{}/'.format(m,s,d), '--model', m])
+                          '--run_name', 'best_fixmatch/{}/{}/{}/'.format(m,s,d), '--model', m])
+
+    sampling = ['True', 'False']
+    dataset = ['Pavia', 'Salinas']
+    model = ['1D', '3D']
+    for m in model:
+        for s in sampling:
+            for d in dataset:
+                main(['--server', '--sampling_fixed', s, '--method', 'supervised', '--runs', str(2),
+                      '--epochs', str(60), '--dataset', d, '--extra_data', e, '--samples', str(40),
+                      '--run_name', 'best_supervised/{}/{}/{}/'.format(m,s,d), '--model', m])
+
 
     """
     #aug = ['none', 'spatial_combinations', 'moving_average', 'spectral_mean', 'pca']

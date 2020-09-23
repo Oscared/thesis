@@ -147,7 +147,7 @@ class RandAugment(object):
         self.m = m
         self.patch_size = patch_size
         if self.patch_size > 1:
-            self.augment_pool = augment_pool_mean()
+            self.augment_pool = augment_pool_1()
         else:
             self.augment_pool = augment_pool_2()
 
