@@ -84,6 +84,8 @@ def main(raw_args=None):
                         help='Magnitude of augmentation. Defualts to 1, min 1 and max 10.')
     parser.add_argument('--augmentation_amount', type=int, default=2,
                         help='Amount of augmentations in RandAugment. Zero equals dont use. Defualts to 2, min 0 and max 10.')
+    parser.add_argument('--special_aug', type=str, default=None,
+                        help='Choose if doing just one augmentation.')
 
     parser.add_argument('--results', type=str, default='results',
                         help='where to save results to (default results)')

@@ -12,7 +12,7 @@ def flip(data, **kwargs):
         data = np.flipud(data)
     return data
 
-def radiation_noise(data, alpha_range=(0.9, 1.1), bias=1/25, **kwargs):
+def radiation_noise(data, alpha_range=(0.9, 1.1), bias_b=1/25, **kwargs):
     alpha = np.random.uniform(*alpha_range)
     noise = np.random.normal(loc=0., scale=1.0, size=data.shape)
     return alpha * data + bias * noise
@@ -139,7 +139,7 @@ def augment_pool_mean():
 
 
 class RandAugment(object):
-    def __init__(self, n, m, patch_size):
+    def __init__(self, n, m, patch_size, special_aug=None):
         assert n>=1
         assert 1 <= m <= 10
 
@@ -147,9 +147,12 @@ class RandAugment(object):
         self.m = m
         self.patch_size = patch_size
         if self.patch_size > 1:
-            self.augment_pool = augment_pool_1()
+            self.augment_pool = augment_pool_mean()
         else:
             self.augment_pool = augment_pool_2()
+
+        if special_aug is not None:
+            self.augment_pool = [(special_aug, None, None)]
 
     def __call__(self, data):
         #print(data.shape)

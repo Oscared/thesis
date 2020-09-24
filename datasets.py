@@ -532,6 +532,9 @@ class HyperX_patches(torch.utils.data.Dataset):
         self.patch_size = args['patch_size']
         self.name = args['dataset']
         self.ignored_labels = set(args['ignored_labels'])
+
+        self.special_aug = args['special_aug']
+
         #Augmentations
         self.flip_augmentation = args['flip_augmentation']
         self.radiation_augmentation = args['radiation_augmentation']
@@ -547,7 +550,8 @@ class HyperX_patches(torch.utils.data.Dataset):
         self.n = args['augmentation_amount']
         self.M = args['augmentation_magnitude']
 
-        self.rand_aug = RandAugment(self.n, self.M, self.patch_size)
+        self.rand_aug = RandAugment(self.n, self.M, self.patch_size,
+                                    special_aug = args.special_aug)
 
         self.center_pixel = args['center_pixel']
         self.labeled = labeled

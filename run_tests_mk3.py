@@ -44,6 +44,8 @@ def main(raw_args=None):
                         help='Amount of augmentations')
     parser.add_argument('--M', type=int, default=2,
                         help='Strength of augmentations')
+    parser.add_argument('--special_aug', type=str, default=None,
+                        help='Choose if to do just one special aug with randaug for supervised')
 
     parser.add_argument('--pretrain', type=int, default=0,
                         help='pretrain epochs')
@@ -117,7 +119,7 @@ def main(raw_args=None):
                                        '--augmentation_magnitude', str(args.M),
                                        '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size),
                                        '--fold', '{}'.format(f), '--cuda', '0', '--sampling_fixed', args.sampling_fixed,
-                                       '--samples_per_class', str(args.samples)]
+                                       '--samples_per_class', str(args.samples), '--special_aug', args.special_aug]
                 elif args.augment == 'spatial_combinations':
                     supervised_args = ['--augmentation_magnitude', str(args.M), '--spatial_combinations', '--class_balancing', '--dataset', args.dataset, '--data_dir', data_path.format(data_folder), '--results', 'results/{}/{}/'.format(args.run_name, args.augment),'--epochs', '{}'.format(args.epochs), '--lr', '{}'.format(args.lr), '--batch_size', '{}'.format(args.batch_size), '--fold', '{}'.format(f), '--cuda', '0', '--sampling_fixed', args.sampling_fixed]
                 elif args.augment == 'spectral_mean':
@@ -223,18 +225,19 @@ if __name__ == '__main__':
                 main(['--server', '--sampling_fixed', s, '--method', 'supervised', '--runs', str(2),
                       '--epochs', str(60), '--dataset', d, '--extra_data', e, '--samples', str(40),
                       '--run_name', 'best_supervised/{}/{}/{}/'.format(m,s,d), '--model', m])
-    """
 
     """
+
     #aug = ['none', 'spatial_combinations', 'moving_average', 'spectral_mean', 'pca']
-    N = [1,2,3]
-    M = [2,4,7]
-    for n in N:
-        for m in M:
-            main(['--server', '--method', 'fixmatch', '--runs', str(2), '--epochs',
-                  '60', '--n', str(n), '--M', str(m), '--run_name', 'fixmatch_rand_aug/{}/{}'.format(n,m),
-                  '--sampling_fixed', 'True', '--samples', str(40)])
-    """
+    N = [1,2,4,8]
+    M = [1,2,4,8]
+    for a in aug:
+        for n in N:
+            for m in M:
+                main(['--server', '--method', 'supervised', '--runs', str(2), '--epochs',
+                      '60', '--n', str(n), '--M', str(m), '--run_name', 'sup_spec_aug_randaug/{}/{}/{}'.format(a,n,m),
+                      '--sampling_fixed', 'True', '--samples', str(40), '--special_aug', a,
+                      '--augment', 'rand'])
     """
     N = [1,2,4]
     M = [1,4,6]
@@ -269,15 +272,18 @@ if __name__ == '__main__':
               '--epochs', str(60), '--dataset', 'Salinas', '--samples', str(40),
               '--n', str(n), '--M', str(m), '--run_name', 'new_mean'])
     """
-
+    """
     # Good param is warmup 2, consistency 100, ramp_up 5, decay 0.9 for example
-    dataset = ['Salinas', 'Pavia']
-    unlabeled = ['2', '4', '8', '16']
+    warmup = ['0', '2']
+    decay = ['0.90', '0.92', '0.95']
     n=1
     m=2
-    for d in dataset:
-        for u in unlabeled:
+    for w in warmup:
+        for d in decay:
             main(['--server', '--sampling_fixed', 'True', '--method', 'mean', '--runs', str(2),
-                  '--epochs', str(60), '--dataset', d, '--samples', str(40),
-                  '--n', str(n), '--M', str(m), '--run_name', 'mean_unlabeled/{}/{}'.format(d,u),
-                  '--unlabeled_ratio', u])
+                  '--epochs', str(60), '--dataset', 'Salinas', '--samples', str(40),
+                  '--n', str(n), '--M', str(m), '--run_name', 'mean_rand_aug_w_d_param/{}/{}'.format(n,m),
+                  '--warmup', w,
+                  '--consistency', '100', '--consistency_rampup', '5',
+                  '--ema_decay', d])
+    """
