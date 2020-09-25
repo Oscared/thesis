@@ -93,7 +93,9 @@ def main(raw_args=None):
                         help='Magnitude of augmentation (so far only for cutout). Defualts to 1, min 1 and max 10.')
     parser.add_argument('--augmentation_amount', type=int, default=1,
                         help='amount of augmentation (so far only for cutout). Defualts to 1, min 1 and max 10.')
-
+    parser.add_argument('--special_aug', type=str, default=None,
+                        help='Choose if doing just one augmentation.')
+    
     parser.add_argument('--results', type=str, default='results',
                         help='where to save results to (default results)')
     parser.add_argument('--save_dir', type=str, default='/saves/',
