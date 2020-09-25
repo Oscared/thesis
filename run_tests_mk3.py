@@ -229,16 +229,16 @@ if __name__ == '__main__':
     """
 
     #aug = ['none', 'spatial_combinations', 'moving_average', 'spectral_mean', 'pca']
-    N = [1,2,4,8]
-    M = [1,2,4,8]
+    N = [1]
+    M = [1,2,4,8,10]
     aug = ['radiation_noise', 'spatial_combinations', 'spectral_mean', 'moving_average',
            'spectral_shift', 'band_combination']
     for a in aug:
         for n in N:
             for m in M:
                 main(['--server', '--method', 'supervised', '--runs', str(2), '--epochs',
-                      '60', '--n', str(n), '--M', str(m), '--run_name', 'sup_spec_aug_randaug/{}/{}/{}'.format(a,n,m),
-                      '--sampling_fixed', 'True', '--samples', str(40), '--special_aug', a,
+                      '60', '--n', str(n), '--M', str(m), '--run_name', 'sup_spec_aug_randaug/{}/mag_{}'.format(a,m),
+                      '--sampling_fixed', 'False', '--samples', str(40), '--special_aug', a,
                       '--augment', 'rand'])
     """
     N = [1,2,4]
