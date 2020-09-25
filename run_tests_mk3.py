@@ -231,6 +231,8 @@ if __name__ == '__main__':
     #aug = ['none', 'spatial_combinations', 'moving_average', 'spectral_mean', 'pca']
     N = [1,2,4,8]
     M = [1,2,4,8]
+    aug = ['radiation_noise', 'spatial_combinations', 'spectral_mean', 'moving_average',
+           'spectral_shift', 'band_combination']
     for a in aug:
         for n in N:
             for m in M:

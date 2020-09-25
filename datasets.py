@@ -551,7 +551,7 @@ class HyperX_patches(torch.utils.data.Dataset):
         self.M = args['augmentation_magnitude']
 
         self.rand_aug = RandAugment(self.n, self.M, self.patch_size,
-                                    special_aug = args.special_aug)
+                                    special_aug = self.special_aug)
 
         self.center_pixel = args['center_pixel']
         self.labeled = labeled
