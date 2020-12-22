@@ -155,12 +155,9 @@ class RandAugment(object):
             self.augment_pool = [(special_aug, None, None)]
 
     def __call__(self, data):
-        #print(data.shape)
         #if self.patch_size == 1:
             #data = np.reshape(data, (1,1,data.shape[0]))
         ops = random.choices(self.augment_pool, k=self.n)
-        #print(ops[0][0])
-        #print(ops[1][0])
         for op, max_v, bias in ops:
             v = np.random.randint(1, self.m+1)
             if random.random() < 0.5:

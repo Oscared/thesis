@@ -71,7 +71,7 @@ def main(raw_args=None):
     if args.server:
         data_path = '/data/ieee_supplement/Hyperspectral_Grids/{}'
     else:
-        data_path = '/home/oscar/Desktop/Exjobb/Data/ieee_supplement/Hyperspectral_Grids/{}'
+        data_path = '/Data/ieee_supplement/Hyperspectral_Grids/{}'
 
     if args.dataset == 'Indiana':
         folds = 4
@@ -269,7 +269,7 @@ if __name__ == '__main__':
               '--epochs', str(60), '--dataset', 'Salinas', '--samples', str(40),
               '--n', str(n), '--M', str(m), '--run_name', 'new_mean'])
     """
-
+    """
     # Good param is warmup 2, consistency 100, ramp_up 5, decay 0.9 for example
     dataset = ['Salinas', 'Pavia']
     unlabeled = ['2', '4', '8', '16']
@@ -281,3 +281,4 @@ if __name__ == '__main__':
                   '--epochs', str(60), '--dataset', d, '--samples', str(40),
                   '--n', str(n), '--M', str(m), '--run_name', 'mean_unlabeled/{}/{}'.format(d,u),
                   '--unlabeled_ratio', u])
+    """

@@ -349,7 +349,7 @@ class HyperX(torch.utils.data.Dataset):
     #[0 0 P 0 0]
     #[0 0 0 0 0]
     #[0 0 0 0 0]
-    #fucked up augmentation purely made for 5x5 patches...
+    #augmentation purely made for 5x5 patches...
     def cutout_hsi(image):
         cutout_image = image
         y = np.random.choice([-1,0,1])
@@ -377,6 +377,7 @@ class HyperX(torch.utils.data.Dataset):
             y2 = np.max(y, y_step)
         cutout_image[y1:y2,x1:x2,:] = 0
         return cutout_image
+
     def cutout(image, size=2, n_squares=1):
         h, w, channels = image.shape
         new_image = image
@@ -644,44 +645,6 @@ class HyperX_patches(torch.utils.data.Dataset):
         data_aug = data_aug + self.data_mean
         return data_aug
 
-    #Cutout augmentation, cut out a random part of the image and replace with ignored label
-    #this is the vanilla implementation, might not work for this case because
-    #of the middle pixel. The middle pixel should not be cut out since it is everything
-    #[0 0 0 0 0]
-    #[0 0 0 0 0]
-    #[0 0 P 0 0]
-    #[0 0 0 0 0]
-    #[0 0 0 0 0]
-    #fucked up augmentation purely made for 5x5 patches...
-    """
-    def cutout_spatial(self, image):
-        cutout_image = image
-        y = np.random.choice([-1,0,1])
-        if y == 0:
-            x = np.random.choice([-1,1])
-            x_step = 2*x
-            x1 = np.min([x, x_step]) + 2
-            x2 = np.max([x, x_step]) + 2
-
-            y_step = np.random.choice([-1,1])
-            y1 = np.min([y, y_step]) + 2
-            y2 = np.max([y, y_step]) + 2
-        else:
-            x = np.random.choice([-1,0,1])
-            if x == 0:
-                x_step = np.random.choice([-1,1])
-                x1 = np.min([x, x_step]) + 2
-                x2 = np.max([x, x_step]) + 2
-            else:
-                x_step = np.random.choice([-1,1])
-                x1 = np.min([x, x_step]) + 2
-                x2 = np.max([x, x_step]) + 2
-            y_step = 2*y
-            y1 = np.min([y, y_step]) + 2
-            y2 = np.max([y, y_step]) + 2
-        cutout_image[y1:y2,x1:x2,:] = 0
-        return cutout_image
-    """
     def cutout_spatial(self, data):
         cutout_image = np.copy(data)
         x,y = data.shape[:2]
@@ -691,6 +654,7 @@ class HyperX_patches(torch.utils.data.Dataset):
         else:
             cutout_image[x_c, y_c, :] = 0
             return cutout_image
+
     #Hyperspectral cutout method to cutout part of the spectral bands
     def cutout_spectral(self, image, M=1):
         h, w, channels = image.shape
@@ -858,9 +822,7 @@ class HyperX_patches(torch.utils.data.Dataset):
 
             data_weak = self.data[p, x1:x2, y1:y2]
             data_strong = np.copy(data_weak)
-            #print('Shape of original data')
-            #print(data_strong.shape)
-            #This will currently not work with data that has no labels, it doesnt harm it right now either though...
+            #This will currently not work with data that has no labels, it doesnt harm it right now either though.
             # i.e. it is a zero matrix
             #label_weak = self.label[p, x1:x2, y1:y2]
             #label_strong = np.copy(label_weak)
@@ -871,8 +833,7 @@ class HyperX_patches(torch.utils.data.Dataset):
                 #data_strong, label_strong = self.flip(data_strong, label_strong)
                 data_weak = self.flip(data_weak)[0]
                 data_strong = self.flip(data_strong)[0]
-                #print('Shape after flip')
-                #print(np.array(data_weak).shape)
+
             """
             if np.random.rand() < 0.5:
                 data_strong = self.radiation_noise(data_strong)
@@ -892,9 +853,6 @@ class HyperX_patches(torch.utils.data.Dataset):
 
             #data_weak = self.flip(data_weak)
             data_strong = self.rand_aug(np.array(data_strong))
-            #print('Shape after rand aug')
-            #print(data_strong.shape)
-            #print(np.array(data_weak).shape)
             # Copy the data into numpy arrays (PyTorch doesn't like numpy views)
             data_weak = np.asarray(np.copy(data_weak).transpose((2, 0, 1)), dtype='float32')
 
@@ -925,8 +883,7 @@ class HyperX_patches(torch.utils.data.Dataset):
 
             data_weak = self.data[p, x1:x2, y1:y2]
             data_strong = np.copy(data_weak)
-            #print(data_strong.shape)
-            #This will currently not work with data that has no labels, it doesnt harm it right now either though...
+            #This will currently not work with data that has no labels, it doesnt harm it right now either though.
             # i.e. it is a zero matrix
             #label_weak = self.label[p, x1:x2, y1:y2]
             #label_strong = np.copy(label_weak)

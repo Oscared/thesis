@@ -73,7 +73,7 @@ def main(raw_args=None):
     if args.server:
         data_path = '/data/ieee_supplement/Hyperspectral_Grids/{}'
     else:
-        data_path = '/home/oscar/Desktop/Exjobb/Data/ieee_supplement/Hyperspectral_Grids/{}'
+        data_path = '/Data/ieee_supplement/Hyperspectral_Grids/{}'
 
     if args.dataset == 'Indiana':
         folds = 4
